@@ -84,7 +84,9 @@ app.include_router(admin.router)
 # ──────────────────────────────────────────────────────────────────────────────
 # Static Files & Dashboard
 # ──────────────────────────────────────────────────────────────────────────────
-app.mount("/static", StaticFiles(directory="static"), name="static")
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.isdir(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/", tags=["Dashboard"])
 def redirect_to_dashboard():
