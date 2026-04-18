@@ -154,7 +154,6 @@
 
   function showPetakInfo(props) {
     document.getElementById('petakInfo').classList.remove('hidden');
-    document.getElementById('petakId').textContent = props.id_sawah ?? 'N/A';
     
     // Admin: tambahkan tombol hapus di panel petak
     let adminButtons = '';
@@ -181,8 +180,11 @@
     Charts.renderTrend('chartTrend', trendData, 'Pertumbuhan NDVI');
 
     const suffix = wilayahName ? `(Kec. ${wilayahName})` : '(Seluruh Kab. Karawang)';
-    document.getElementById('section2TitleText').textContent = suffix;
+    if(document.getElementById('section2TitleText')) document.getElementById('section2TitleText').textContent = suffix;
     if(document.getElementById('kpiNdviWilayahInfo')) document.getElementById('kpiNdviWilayahInfo').textContent = suffix;
+    
+    // Sync filter
+    if(document.getElementById('trendFilterKecamatan')) document.getElementById('trendFilterKecamatan').value = wilayahName || '';
   }
 
   // ══════════════════════════════════════════════════════
@@ -194,6 +196,13 @@
     }
 
     state.selectedKecamatan = props.kecamatan;
+
+    // Auto-sync dropdown wilayah di topbar
+    const dd = document.getElementById('filterKecamatan');
+    if (dd && dd.value !== props.kecamatan) {
+      dd.value = props.kecamatan;
+      state.filters.kecamatan = props.kecamatan;
+    }
 
     setActiveLayerBtn('sawah');
     setMapLoader(true, `Mengekstrak poligon sawah ${props.kecamatan}...`);
@@ -215,6 +224,29 @@
   // ══════════════════════════════════════════════════════
   // MUAT DATA DASHBOARD REGIONAL
   // ══════════════════════════════════════════════════════
+  function _refreshGlobalKpi() {
+    if(!state.batasData || !state.batasData.features) return;
+    
+    let tLuas = 0, tPetak = 0, sumNdvi = 0, cNdvi = 0, tWilayah = 0;
+    state.batasData.features.forEach(f => {
+      const p = f.properties;
+      if(p.total_luas) tLuas += p.total_luas;
+      if(p.jumlah_petak) tPetak += p.jumlah_petak;
+      if(p.luas_wilayah) tWilayah += p.luas_wilayah;
+      if(p.avg_ndvi !== null) { sumNdvi+=p.avg_ndvi; cNdvi++; }
+    });
+
+    fillKpiVal('kpiKecamatan', state.batasData.features.length);
+    fillKpiVal('kpiLuasKab', Data.fmt(Math.round(tWilayah)) + ' <span class="kpi-unit">Hektar</span>');
+    fillKpiVal('kpiLuas', Data.fmt(Math.round(tLuas)) + ' <span class="kpi-unit">Hektar</span>');
+    let persentaseLahan = tWilayah > 0 ? ((tLuas / tWilayah) * 100).toFixed(1) : 0;
+    if(document.getElementById('kpiPersentaseLuas')) {
+       document.getElementById('kpiPersentaseLuas').textContent = `Mewakili ${persentaseLahan}% wilayah daratan Karawang`;
+    }
+    fillKpiVal('kpiPetak', Data.fmt(tPetak) + ' <span class="kpi-unit">Petak</span>');
+    fillKpiVal('kpiNdvi', cNdvi ? (sumNdvi/cNdvi).toFixed(3) : '–');
+  }
+
   async function loadGlobalDashboard() {
     setMapLoader(true, "Menganalisa Data Satelit Seluruh Wilayah...");
     setStatus("Sedang Berjalan", "ok");
@@ -222,26 +254,8 @@
     try {
       state.batasData = await Data.fetchBatasGeoJSON(state.filters);
       MapManager.renderBatas(state.batasData, handleKecamatanClick);
-
-      // Hitung KPI
-      let tLuas = 0, tPetak = 0, sumNdvi = 0, cNdvi = 0, tWilayah = 0;
-      state.batasData.features.forEach(f => {
-        const p = f.properties;
-        if(p.total_luas) tLuas += p.total_luas;
-        if(p.jumlah_petak) tPetak += p.jumlah_petak;
-        if(p.luas_wilayah) tWilayah += p.luas_wilayah;
-        if(p.avg_ndvi !== null) { sumNdvi+=p.avg_ndvi; cNdvi++; }
-      });
-
-      fillKpiVal('kpiKecamatan', state.batasData.features.length);
-      fillKpiVal('kpiLuasKab', Data.fmt(Math.round(tWilayah)) + ' <span class="kpi-unit">Hektar</span>');
-      fillKpiVal('kpiLuas', Data.fmt(Math.round(tLuas)) + ' <span class="kpi-unit">Hektar</span>');
-      let persentaseLahan = tWilayah > 0 ? ((tLuas / tWilayah) * 100).toFixed(1) : 0;
-      if(document.getElementById('kpiPersentaseLuas')) {
-         document.getElementById('kpiPersentaseLuas').textContent = `Mewakili ${persentaseLahan}% wilayah daratan Karawang`;
-      }
-      fillKpiVal('kpiPetak', Data.fmt(tPetak) + ' <span class="kpi-unit">Petak</span>');
-      fillKpiVal('kpiNdvi', cNdvi ? (sumNdvi/cNdvi).toFixed(3) : '–');
+      
+      _refreshGlobalKpi();
 
       // BI SUMMARY AUTO-GENERATOR
       let badKecamatan = [];
@@ -265,9 +279,6 @@
 
       document.getElementById('biSummaryText').innerHTML = biText;
 
-      // DATA QUALITY METRICS
-      document.getElementById('dataQualityBadge').textContent = `Menampilkan ${cNdvi} piksel unit data sukses (Sisa: tutupan awan / tidak terekam)`;
-
       renderRankingTable();
       await loadNdviCharts(state.filters, state.filters.kecamatan);
 
@@ -282,11 +293,27 @@
   // Expose reload for Admin module
   window._reloadDashboard = loadGlobalDashboard;
 
-  // Reload spesifik layer sawah tanpa mental/zoom reset
+  // Reload spesifik layer sawah beserta pembaruan KPI
   window._reloadSawahLayer = async function() {
     if (state.activeLayer === 'sawah' && state.selectedKecamatan) {
+      // Refresh global KPI secara background agar data batas wilayah ter-update
+      state.batasData = await Data.fetchBatasGeoJSON(state.filters);
+      _refreshGlobalKpi();
+      
+      // Temukan properties kecamatan yang sedang aktif dari batasData terbaru
+      const updatedProps = state.batasData.features.find(
+        f => f.properties.kecamatan === state.selectedKecamatan
+      )?.properties;
+      
+      // Refresh info sidebar jika ada
+      if (updatedProps) {
+        await showKecamatanInfo(updatedProps);
+        renderRankingTable();
+      }
+
+      // Render ulang poligon sawah tanpa reset zoom (true)
       const sawahGeo = await Data.fetchSawahGeoJSON(state.selectedKecamatan, 100000);
-      MapManager.renderSawah(sawahGeo, showPetakInfo, true); // true = skip fitBounds
+      MapManager.renderSawah(sawahGeo, showPetakInfo, true);
     } else {
       await loadGlobalDashboard();
     }
@@ -300,6 +327,7 @@
       const kecs = await Data.fetchKecamatanList();
       kecs.forEach(k => {
         document.getElementById('filterKecamatan').insertAdjacentHTML('beforeend', `<option value="${k}">${k}</option>`);
+        if(document.getElementById('trendFilterKecamatan')) document.getElementById('trendFilterKecamatan').insertAdjacentHTML('beforeend', `<option value="${k}">${k}</option>`);
       });
       const tahuns = await Data.fetchTahunList();
       tahuns.forEach(t => {
@@ -358,6 +386,40 @@
     document.getElementById('opacitySlider').addEventListener('input', (e) => {
       MapManager.setOpacity(parseFloat(e.target.value));
     });
+
+    // Fullscreen Map
+    const btnFullscreenMap = document.getElementById('btnFullscreenMap');
+    if (btnFullscreenMap) {
+      btnFullscreenMap.addEventListener('click', () => {
+        const wrap = document.querySelector('.map-container-wrapper');
+        wrap.classList.toggle('fullscreen-mode');
+        const isFS = wrap.classList.contains('fullscreen-mode');
+        
+        if (isFS) {
+          btnFullscreenMap.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3h-3m16 0h-3v-3m0 18v-3h3M3 16h3v3"/></svg>`;
+        } else {
+          btnFullscreenMap.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`;
+        }
+        
+        const map = window._map || (window.MapManager && window.MapManager.getMap());
+        if (map) {
+          setTimeout(() => map.invalidateSize(), 300); // Trigger relayout for Leaflet
+        }
+      });
+    }
+
+    // Indeks NDVI (Trend Bulanan) Independent Filter
+    const trendKecFilter = document.getElementById('trendFilterKecamatan');
+    if (trendKecFilter) {
+      trendKecFilter.addEventListener('change', async () => {
+        const kec = trendKecFilter.value;
+        const trendData = await Data.fetchTrendNdvi({ kecamatan: kec });
+        Charts.renderTrend('chartTrend', trendData, 'Pertumbuhan NDVI');
+        const suffix = kec ? `(Kec. ${kec})` : '(Seluruh Kab. Karawang)';
+        if(document.getElementById('section2TitleText')) document.getElementById('section2TitleText').textContent = suffix;
+        if(document.getElementById('kpiNdviWilayahInfo')) document.getElementById('kpiNdviWilayahInfo').textContent = suffix;
+      });
+    }
 
     // 4. Filter (Otomatis saat dropdown diganti)
     const onFilterChange = async () => {

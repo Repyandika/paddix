@@ -83,32 +83,32 @@ const MapManager = (() => {
       center: [-6.30, 107.30],
       zoom: 10,
       zoomControl: false,
-      preferCanvas: true, // Agar 50k+ poligon tidak lag
+      preferCanvas: true,
       maxBounds: [
-        [-6.85, 107.0], // Southwest bounds for Karawang
-        [-5.8, 107.8]   // Northeast bounds for Karawang
+        [-6.85, 107.0],
+        [-5.8, 107.8]
       ],
       maxBoundsViscosity: 1.0,
       minZoom: 9
     });
     L.control.zoom({ position: 'topleft' }).addTo(_map);
 
-    // Basemap: ESRI World Imagery (Satelit)
+    // Basemap: Google Maps Satellite (gratis tanpa billing)
     L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
       {
-        attribution: 'Imagery © Esri',
+        attribution: 'Map data © Google',
         maxZoom: 22,
-        maxNativeZoom: 18
+        maxNativeZoom: 20
       }
     ).addTo(_map);
 
-    // Basemap label overlay agar nama jalan/wilayah tetap terbaca
+    // Label overlay agar nama jalan/wilayah tetap terbaca
     L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
       {
         subdomains: 'abcd',
-        opacity: 0.6,
+        opacity: 0.7,
         maxZoom: 22,
         maxNativeZoom: 18,
         pane: 'overlayPane',
@@ -118,11 +118,6 @@ const MapManager = (() => {
 
   // ─── Batas Kecamatan ─────────────────────────────
 
-  /**
-   * Render GeoJSON batas kecamatan.
-   * @param {Object} geojson - FeatureCollection dari API
-   * @param {Function} onClickCb - callback(feature.properties)
-   */
   function renderBatas(geojson, onClickCb) {
     _onKecamatanClick = onClickCb;
 
@@ -133,7 +128,7 @@ const MapManager = (() => {
       onEachFeature(feature, layer) {
         // Hover
         layer.on('mouseover', (e) => {
-          if (_activeLayer === 'sawah') return; // Mencegah Layer Batas menindih Canvas Sawah
+          if (_activeLayer === 'sawah') return;
 
           if (_highlighted) _highlighted.setStyle(kecStyle(_highlighted.feature));
           _highlighted = layer;
@@ -167,12 +162,6 @@ const MapManager = (() => {
     _map.fitBounds(_batasLayer.getBounds(), { padding: [10, 10] });
   }
 
-  /**
-   * Render GeoJSON petak sawah (detail, muncul setelah klik kecamatan).
-   * Batas kecamatan dibuat agak transparan agar sawah lebih terlihat.
-   * @param {Object} geojson - FeatureCollection dari API
-   * @param {Boolean} skipFitBounds - jika true, tidak melakukan auto-zoom out
-   */
   function renderSawah(geojson, onClickCb, skipFitBounds = false) {
     _onPetakClick = onClickCb;
     _activeLayer = 'sawah';
@@ -211,9 +200,9 @@ const MapManager = (() => {
 
         // Click
         layer.on('click', (e) => {
-          L.DomEvent.stop(e); // << PENTING: Cegah Zoom Out / Bubbling
+          L.DomEvent.stop(e);
 
-          // Admin buttons (hanya tampil jika admin)
+          // Admin buttons
           const isAdmin = window.Auth && Auth.isAdmin();
           const adminBtns = isAdmin ? `
             <div style="display:flex; gap:6px; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:8px;">
@@ -247,7 +236,6 @@ const MapManager = (() => {
       },
     }).addTo(_map);
 
-    // Expose layer ref untuk Geoman edit/delete
     window._sawahLayerRef = _sawahLayer;
 
     if (!skipFitBounds && _sawahLayer.getBounds().isValid()) {
@@ -255,7 +243,6 @@ const MapManager = (() => {
     }
   }
 
-  /** Hapus layer sawah & kembalikan batas kecamatan ke normal */
   function clearSawahLayer() {
     if (_sawahLayer) { _map.removeLayer(_sawahLayer); _sawahLayer = null; }
     window._sawahLayerRef = null;
@@ -270,26 +257,22 @@ const MapManager = (() => {
 
   // ─── Mode Tampilan ────────────────────────────────
 
-  /** Ganti mode: 'fill' atau 'outline' */
   function setMode(mode) {
     _activeMode = mode;
     _applyStyles();
   }
 
-  /** Set opacity (0.1 – 1.0) */
   function setOpacity(v) {
     _fillOpacity = v;
     _applyStyles();
   }
 
-  /** Re-apply style ke semua layer aktif */
   function _applyStyles() {
     if (_batasLayer && _activeLayer === 'kecamatan') {
       _batasLayer.setStyle(kecStyle);
     }
     if (_sawahLayer && _activeLayer === 'sawah') {
       _sawahLayer.setStyle(petakStyle);
-      // Batas tetap redup
       if (_batasLayer) {
         _batasLayer.setStyle((feature) => ({
           ...kecStyle(feature), fillOpacity: 0.05, weight: 1, color: '#94a3b8',
@@ -298,14 +281,12 @@ const MapManager = (() => {
     }
   }
 
-  // ─── Zoom Utility ─────────────────────────────────
   function fitBatas() {
     if (_batasLayer) _map.fitBounds(_batasLayer.getBounds(), { padding: [10, 10] });
   }
 
   function getMap() { return _map; }
 
-  // ─── Utility Cari Layer ─────────────────────────────
   function getLayerByOgcFid(ogcFid) {
     let target = null;
     if (_sawahLayer) {
@@ -316,7 +297,6 @@ const MapManager = (() => {
     return target;
   }
 
-  /** Hapus poligon dan refresh dashboard */
   async function deleteAndRefresh(ogcFid) {
     if (!confirm(`Yakin ingin menghapus poligon #${ogcFid}? Tindakan ini tidak bisa dibatalkan.`)) return;
     try {
@@ -329,7 +309,6 @@ const MapManager = (() => {
     }
   }
 
-  // Public API
   return {
     init, renderBatas, renderSawah, clearSawahLayer,
     setMode, setOpacity, fitBatas, getMap, getNdviColor,
