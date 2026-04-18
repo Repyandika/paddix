@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — PADDIX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --forest: #1a2e1a;
+      --forest-mid: #2d4a2d;
+      --sage: #4a7c59;
+      --sage-light: #6aab7a;
+      --sage-ghost: #eef6f0;
+      --sage-border: #c8e6cf;
+      --cream: #faf8f3;
+      --text-primary: #111d11;
+      --text-muted: #6b8f6b;
+      --border-light: #e4ede4;
+      --bg-body: #f2f5f0;
+      --font-sans: 'DM Sans', system-ui, sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --r-md: 10px;
+      --r-lg: 16px;
+      --r-xl: 20px;
+      --shadow-float: 0 8px 24px rgba(26,46,26,.12), 0 2px 8px rgba(26,46,26,.06);
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-body);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image:
+        radial-gradient(circle at 20% 50%, rgba(74,124,89,.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(74,124,89,.06) 0%, transparent 50%);
+    }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: var(--r-xl);
+      border: 1px solid var(--border-light);
+      box-shadow: var(--shadow-float);
+      padding: 40px 36px;
+      text-align: center;
+    }
+
+    .login-icon {
+      width: 56px; height: 56px;
+      background: var(--forest);
+      border-radius: var(--r-lg);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 0 0 4px rgba(74,124,89,.15);
+    }
+
+    .login-icon svg { width: 28px; height: 28px; color: #fff; }
+
+    .login-card h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      letter-spacing: -0.02em;
+    }
+
+    .login-card p.sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+    }
+
+    .form-group {
+      text-align: left;
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--r-md);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      color: var(--text-primary);
+      background: var(--sage-ghost);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: var(--sage);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(74,124,89,.12);
+    }
+
+    .btn-login {
+      width: 100%;
+      height: 46px;
+      border: none;
+      border-radius: var(--r-md);
+      background: var(--forest);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: -0.01em;
+      margin-top: 6px;
+    }
+
+    .btn-login:hover {
+      background: var(--forest-mid);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(26,46,26,.25);
+    }
+
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error-msg {
+      color: #dc2626;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 14px;
+      min-height: 18px;
+      transition: opacity 0.2s;
+    }
+
+    .login-footer {
+      margin-top: 24px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div style="display:flex; justify-content:center; margin-bottom:20px;">
+        <img src="./paddix_logo_user.jpg" alt="PADDIX Logo" style="height:80px; width:auto; border-radius:10px; box-shadow: 0 6px 16px rgba(34,197,94,0.3);">
+      </div>
+      <p class="sub" style="font-size:14px; font-weight:500;">See the fields. Know the future</p>
+
+      <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Masukkan username" required autofocus />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Masukkan password" required />
+        </div>
+        <button type="submit" class="btn-login" id="btnLogin">Masuk ke Dashboard</button>
+        <div class="error-msg" id="errorMsg"></div>
+      </form>
+
+      <div class="login-footer">
+        &copy; Septa Repyandika 2026 &nbsp;·&nbsp; Powered by Karawang GIS Analytics Engine & PADDIX
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8000/api';
+
+    // Jika sudah login, langsung redirect
+    if (localStorage.getItem('gis_token')) {
+      window.location.href = 'index.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btnLogin');
+      const errEl = document.getElementById('errorMsg');
+      errEl.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Memverifikasi...';
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.detail || 'Login gagal');
+        }
+
+        const data = await res.json();
+        localStorage.setItem('gis_token', data.access_token);
+        localStorage.setItem('gis_user', JSON.stringify(data.user));
+        window.location.href = 'index.html';
+      } catch (err) {
+        errEl.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Masuk ke Dashboard';
+      }
+    });
+  </script>
+
+</body>
+</html>

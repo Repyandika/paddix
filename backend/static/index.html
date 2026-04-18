@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PADDIX - Executive Dashboard</title>
+  <meta name="description" content="Dashboard spasial padi/sawah dengan performa tinggi & analisis tingkat makro-mikro" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin />
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.19.2/dist/leaflet-geoman.css" />
+  <link rel="stylesheet" href="./css/style.css?v=v11" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <div class="topbar-container">
+      <div class="topbar-brand">
+        <div style="display:flex; align-items:center; gap:16px;">
+          <img src="./paddix_logo_user.jpg" alt="PADDIX Logo" style="height:52px; width:auto; border-radius:6px; box-shadow: 0 4px 12px rgba(34,197,94,0.15);">
+          <div style="display:flex; flex-direction:column; justify-content:center;">
+            <span class="topbar-sub" style="font-size:14px; font-weight:600; font-family:'Outfit', sans-serif; letter-spacing:0.02em; margin:0;">See the fields. Know the future</span>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-filters">
+        <div class="filter-item">
+          <label for="filterKecamatan">Wilayah:</label>
+          <select id="filterKecamatan">
+            <option value="">Seluruh Kabupaten Karawang</option>
+          </select>
+        </div>
+        <!-- User info & Logout -->
+        <div class="user-info-bar">
+          <span id="userDisplayName" style="font-size:12px; color:rgba(255,255,255,.7); font-weight:600;"></span>
+          <button id="btnLogout" class="btn-logout" title="Keluar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ADMIN TOOLBAR (hanya tampil untuk admin) -->
+  <div id="adminToolbar" class="admin-toolbar hidden">
+    <div class="admin-toolbar-inner">
+      <span class="admin-badge">ADMIN</span>
+      <button class="admin-btn" id="btnDownloadCsv" title="Unduh CSV NDVI">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Unduh Data
+      </button>
+      <button class="admin-btn" id="btnUploadCsv" title="Upload CSV">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Data
+      </button>
+      <button class="admin-btn" id="btnEditPolygon" title="Edit Poligon Sawah">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit Poligon
+      </button>
+      <button class="admin-btn" id="btnDeletePolygon" title="Hapus Poligon Sawah">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Hapus Poligon
+      </button>
+      <button class="admin-btn" id="btnManageUsers" title="Kelola Akun">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Kelola Akun
+      </button>
+    </div>
+  </div>
+
+  <!-- GEOMAN EDIT BAR (muncul saat mode edit poligon aktif) -->
+  <div id="geomanEditBar" class="draw-toolbar hidden">
+    <span style="font-size:12px; color:#fff;">Mode Edit Aktif — Drag titik sudut poligon untuk mengubah bentuknya</span>
+    <button class="admin-btn" onclick="Admin.saveAllEdits()" style="background:#22c55e; border-color:#16a34a;">Simpan Semua Perubahan</button>
+    <button class="admin-btn" onclick="Admin.cancelAllEdits()" style="background:#dc2626; border-color:#b91c1c;">Batal</button>
+  </div>
+
+  <main class="dashboard-scroll">
+    <div class="status-bar">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Aplikasi Sedang Memuat Data Awal...</span>
+    </div>
+
+    <!-- Peta Utama -->
+    <section class="map-container-wrapper">
+      <div id="map"></div>
+      <div id="mapLoader" class="map-loader hidden">
+        <div class="loader-spinner"></div>
+        <span id="mapLoaderText">Menarik jutaan data...</span>
+      </div>
+
+      <div class="map-floating-controls">
+        <div class="control-card">
+          <h4 class="control-title">Lapisan Terlihat</h4>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="btnLayerKec" data-layer="kecamatan">Perbatasan Wilayah</button>
+            <button class="toggle-btn" id="btnLayerSawah" data-layer="sawah">Polygon Lahan Sawah</button>
+          </div>
+          <div class="mode-toggles mt-2 hidden" id="sawahStyleControls">
+            <h4 class="control-title" style="margin-top:12px;">Gaya Polygon Sawah</h4>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="btnOutline" data-mode="outline">Outline (Satelit Jelas)</button>
+              <button class="toggle-btn" id="btnFill" data-mode="fill">Fill (Warna Penuh)</button>
+            </div>
+            <div class="opacity-control mt-2">
+              <label for="opacitySlider" class="control-title">Kepadatan Warna:</label>
+              <input type="range" id="opacitySlider" min="0.1" max="1" step="0.05" value="0.75" class="slider" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-floating-legend">
+        <h4>Indikasi Risiko Lahan (NDVI)</h4>
+        <div class="legend-grid">
+          <div class="legend-item"><span class="dot" style="background:#dc2626;"></span><span>Tinggi (&lt;0.15)</span></div>
+          <div class="legend-item"><span class="dot" style="background:#f97316;"></span><span>Waspada (0.15–0.25)</span></div>
+          <div class="legend-item"><span class="dot" style="background:#eab308;"></span><span>Perhatian (0.25–0.35)</span></div>
+          <div class="legend-item"><span class="dot" style="background:#84cc16;"></span><span>Aman (0.35–0.5)</span></div>
+          <div class="legend-item"><span class="dot" style="background:#22c55e;"></span><span>Sehat (0.5–0.65)</span></div>
+          <div class="legend-item"><span class="dot" style="background:#166534;"></span><span>Sangat Sehat (&gt;0.65)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel Informasi Interaktif & Dashboard Regional -->
+    <div id="fullDashboardPanels">
+
+    <!-- BI EXECUTIVE SUMMARY (Auto-Generated) -->
+    <section class="analytics-container" style="padding-bottom:10px;">
+      <h2 style="font-size:16px; font-weight:800; color:var(--forest); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#eab308;"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A6 6 0 1 0 7.5 11.5c.76.76 1.23 1.52 1.41 2.5Z"/></svg> 
+         Insight
+      </h2>
+      <div id="biSummaryPanel" style="background:var(--sage-ghost); border:1px solid var(--sage-border); border-left:4px solid var(--sage); padding:16px 20px; border-radius:var(--r-md); display:flex; gap:16px; align-items:flex-start; margin-bottom:10px;">
+        <div style="flex:1">
+          <p id="biSummaryText" style="font-size:14px; color:var(--text-primary); line-height:1.6; margin:0;">
+            Mengumpulkan data insight secara otomatis...
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: INVENTARISASI LAHAN -->
+    <section class="analytics-container pt-8" style="padding-top:10px;">
+      <h2>1. Informasi Tata Ruang & Kapasitas Sawah</h2>
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-title">Total Wilayah Kecamatan</div>
+          <div class="kpi-value" id="kpiKecamatan">–</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title" title="Estimasi luas seluruh lahan daratan">Total Luas Wilayah Kabupaten</div>
+          <div class="kpi-value" id="kpiLuasKab">–</div>
+        </div>
+        <div class="kpi-card highlight-card">
+          <div class="kpi-title" title="Luas murni area persawahan">Total Luas Lahan Sawah Kab Karawang</div>
+          <div class="kpi-value" id="kpiLuas" style="margin-bottom:2px;">–</div>
+          <div id="kpiPersentaseLuas" style="font-size:11px; font-weight:600; color:rgba(255,255,255,0.85);"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title" title="Detail partisi letak/aset poligon dari pemetaan">Jumlah Total Petak Sawah</div>
+          <div class="kpi-value" id="kpiPetak">–</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="dashboard-panel info-panel">
+          <div class="panel-header">
+            <h3>Informasi Area Terpilih</h3>
+            <span class="badge" id="infoTitleBadge">Global Indikator</span>
+          </div>
+          <div class="panel-body">
+            <div id="defaultInfo" class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+              <p>Belum ada kecamatan yang dipilih.<br>Silahkan klik peta Satelit di atas untuk memanggil data polygon sawah per-wilayah.</p>
+            </div>
+            <div id="kecamatanInfo" class="hidden">
+              <h4 class="sub-title" id="detailKecNama">Nama Kecamatan</h4>
+              <table class="detail-table">
+                <tbody id="detailStatTable"></tbody>
+              </table>
+
+              <!-- Local NDVI Section -->
+              <div style="background:#f0fdf4; border:1px solid #bbf7d0; padding:12px; margin-top:15px; border-radius:8px;">
+                <h5 style="color:#166534; font-size:13px; margin:0 0 5px 0;" id="localNdviTitle">Status NDVI di Wilayah</h5>
+                <div class="risk-badge" id="riskBadgeDetail" style="margin-bottom:8px;">–</div>
+                <p style="font-size:11px; color:#15803d; line-height:1.4" id="localNdviDesc">Keterangan Kondisi</p>
+              </div>
+
+              <p class="hint-text mt-4">Detail petak juga akan dimunculkan di layar Info Map saat diklik</p>
+            </div>
+            <div id="petakInfo" class="petak-box hidden">
+              <h4 class="sub-title">Inspeksi Lahan (ID: <span id="petakId">0</span>)</h4>
+              <table class="detail-table">
+                <tbody id="petakStatTable"></tbody>
+              </table>
+              <button class="btn-ghost mt-2" onclick="document.getElementById('petakInfo').classList.add('hidden')">Tutup Inspeksi Visual</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-panel">
+          <div class="panel-header" style="flex-direction:row; align-items:center;">
+            <div>
+              <h3>Luas Lahan Sawah per Kecamatan</h3>
+              <p class="panel-desc">Distribusi lahan sawah berdasarkan rekapitulasi KPI Luas Hektar</p>
+            </div>
+          </div>
+          <div class="panel-body chart-wrapper" style="height:350px;">
+            <canvas id="chartSawah"></canvas>
+          </div>
+        </div>
+
+        <div class="dashboard-panel">
+          <div class="panel-header" style="flex-direction:column; align-items:stretch;">
+            <h3>Peringkat Kinerja Wilayah</h3>
+            <select id="rankingKategori" class="mt-2" style="width:100%; font-size:12px; height:34px; border-color:var(--border-mid); border-radius:6px; padding-left:10px;">
+              <option value="terluas">Sawah Terluas (Hektar)</option>
+              <option value="kepadatan">Kepadatan Lahan Sawah (%)</option>
+              <option value="ndvi_best">NDVI Terbaik (Paling Sehat)</option>
+              <option value="ndvi_worst">NDVI Terburuk (Risiko Tinggi)</option>
+            </select>
+          </div>
+          <div class="panel-body mt-2" style="align-items:stretch; justify-content:flex-start;">
+            <table class="detail-table ranking-table" style="font-size:12px">
+              <tbody id="rankingTableBody">
+                <tr><td colspan="2" style="text-align:center; color:var(--text-muted);">Memuat peringkat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: ANALISIS NDVI (TEMPORAL) -->
+    <section class="analytics-container" style="padding-top:10px;">
+      <h2 style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:8px;">
+        2. Analisis Tingkat Kesuburan / Indeks NDVI <span id="section2TitleText" style="color:#2563eb">(Seluruh Kab. Karawang)</span>
+      </h2>
+
+      <!-- Filter panel -->
+      <div class="ndvi-filter-panel">
+        <div>
+          <h3>Setel Indikator Temporal NDVI</h3>
+          <p class="panel-desc">Filter berantai pada Peta, Rata-rata Skor, Diagram, dan Papan Peringkat.</p>
+        </div>
+        <div class="ndvi-filter-selects">
+          <select id="filterTahun">
+            <option value="">Rata-rata Seluruh Tahun</option>
+          </select>
+          <select id="filterBulan">
+            <option value="">Sepanjang Tahun</option>
+            <option value="1">Januari</option><option value="2">Februari</option>
+            <option value="3">Maret</option><option value="4">April</option>
+            <option value="5">Mei</option><option value="6">Juni</option>
+            <option value="7">Juli</option><option value="8">Agustus</option>
+            <option value="9">September</option><option value="10">Oktober</option>
+            <option value="11">November</option><option value="12">Desember</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card risk-card">
+          <div class="kpi-title">Nilai Rata-Rata NDVI <span id="kpiNdviWilayahInfo"></span></div>
+          <div class="kpi-value" id="kpiNdvi">–</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;">        <div class="dashboard-panel trend-panel" style="margin-top:0;">
+          <div class="panel-header">
+            <div style="flex:1;">
+              <h3 style="display:flex; align-items:center; gap:8px;">
+                Riwayat Perkembangan NDVI (Time Series Bulanan)
+                <span id="dataQualityBadge" style="font-size:10px; font-weight:700; background:var(--bg-body); padding:3px 8px; border-radius:12px; border:1px solid var(--border-light); color:var(--text-muted);">Menghitung kualitas data...</span>
+              </h3>
+              <p class="panel-desc">Titik merah/oranye menandakan anomali atau bulan dengan Indeks Vegetasi kritis (< 0.25). Garis yang terputus mengindikasikan Data Tidak Tersedia pada bulan tersebut (misal: tutupan awan parah).</p>
+            </div>
+          </div>
+          <div class="panel-body large-chart-wrapper" style="height:320px;">
+            <canvas id="chartTrend"></canvas>
+          </div>
+        </div>
+        
+          <div class="panel-header" style="flex-wrap:wrap; gap:10px;">
+            <div style="flex:1; min-width:300px;">
+              <h3>Heatmap Distribusi Risiko (Kecamatan × Bulan)</h3>
+              <p class="panel-desc">Visualisasi pekat-lemahnya NDVI secara spasio-temporal. <strong style="color:var(--red-risk);">Merah: Kritis</strong>, Kuning: Waspada, <strong style="color:var(--sage);">Hijau: Normal.</strong></p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <select id="heatmapTahun" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
+                <option value="all">Akumulatif Keseluruhan Tahun</option>
+              </select>
+              <select id="heatmapSort" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
+                <option value="asc">Urut Abjad (A-Z)</option>
+                <option value="healthiest">Paling Sehat (NDVI Tertinggi)</option>
+                <option value="worst">Paling Kritis (NDVI Terendah)</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body" style="overflow-x:auto; padding-bottom:10px;">
+             <!-- Tabel HTML Heatmap -->
+             <div id="heatmapContainer" style="min-width:700px; padding:10px; font-size:11px;">Membangun Matrix Heatmap...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: ANALISIS KOMPARATIF YEAR-OVER-YEAR & WILAYAH -->
+    <section class="analytics-container" style="padding-top:10px;">
+      <h2 style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:8px;">
+        3. Analisis Komparatif (Year-over-Year & Antar Wilayah)
+      </h2>
+      <div class="dashboard-grid" style="grid-template-columns: 1fr;"> <!-- Ubah agar full-width stack vertikal -->
+        <div class="dashboard-panel" style="margin-bottom:15px;">
+          <div class="panel-header" style="flex-wrap:wrap; gap:10px;">
+            <div style="flex:1;">
+              <h3>Pertumbuhan NDVI dari Tahun ke Tahun (YoY)</h3>
+              <p class="panel-desc">Perbandingan rata-rata NDVI tahun 2023, 2024, dan 2025.</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <select id="filterYoySort" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
+                <option value="15">Batas: Tampilkan 15 Kecamatan</option>
+                <option value="30">Batas: Tampilkan Seluruh (Scroll)</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body" style="height:380px; overflow-x:auto; overflow-y:hidden; padding-bottom:10px;">
+            <!-- Beri width dinamis lewat JS agar scrollable -->
+            <div id="wrapperYoy" style="width: 1200px; height: 340px; position: relative;">
+              <canvas id="chartYoy"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-panel info-panel">
+          <div class="panel-header" style="flex-direction:column; align-items:stretch;">
+            <h3>Perbandingan Langsung Antar Wilayah</h3>
+            <p class="panel-desc">Bandingkan fluktuasi indeks NDVI secara langsung antara dua kecamatan.</p>
+          </div>
+          <div class="panel-body" style="justify-content:flex-start; margin-top:12px;">
+            <div style="display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center;">
+              <select id="compareKecA" style="width:100%; height:34px; font-size:12px; border:2px solid #2563eb; border-radius:6px; padding-left:10px;"></select>
+              <span style="font-size:12px; font-weight:bold; color:var(--text-muted);">VS</span>
+              <select id="compareKecB" style="width:100%; height:34px; font-size:12px; border:2px solid #ea580c; border-radius:6px; padding-left:10px;"></select>
+            </div>
+            <div class="chart-wrapper mt-4" style="height:350px;">
+              <canvas id="chartCompare"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    </div> <!-- /fullDashboardPanels -->
+
+    <footer class="footer">
+      &copy; Septa Repyandika 2026 &nbsp;·&nbsp; Powered by Karawang GIS Analytics Engine & PADDIX
+    </footer>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- MODALS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+
+  <!-- Modal: Kelola Akun -->
+  <div id="modalUsers" class="modal-overlay hidden" onclick="if(event.target===this)Admin.closeModal('modalUsers')">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Kelola Akun Pengguna</h3>
+        <button class="modal-close" onclick="Admin.closeModal('modalUsers')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <table class="detail-table" style="font-size:13px; margin-bottom:20px;">
+          <thead><tr style="border-bottom:2px solid var(--border-mid);"><th>ID</th><th>Username</th><th>Role</th><th>Aksi</th></tr></thead>
+          <tbody id="userListBody"></tbody>
+        </table>
+        <div style="background:var(--sage-ghost); border:1px solid var(--sage-border); padding:16px; border-radius:10px;">
+          <h4 style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--forest);">Tambah User Baru</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr auto auto; gap:8px; align-items:end;">
+            <div>
+              <label style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Username</label>
+              <input type="text" id="newUsername" placeholder="username" style="width:100%; height:36px; padding:0 10px; border:1px solid var(--border-mid); border-radius:6px; font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Password</label>
+              <input type="password" id="newPassword" placeholder="password" style="width:100%; height:36px; padding:0 10px; border:1px solid var(--border-mid); border-radius:6px; font-size:13px;" />
+            </div>
+            <div>
+              <label style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Role</label>
+              <select id="newRole" style="height:36px; background:#fff; color:var(--text-primary); border:1px solid var(--border-mid); border-radius:6px; font-size:13px; min-width:90px;">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="Admin.handleAddUser()" style="height:36px;">Tambah</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Upload CSV -->
+  <div id="modalImport" class="modal-overlay hidden" onclick="if(event.target===this)Admin.closeModal('modalImport')">
+    <div class="modal-box" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>Upload Batas Wilayah (CSV)</h3>
+        <button class="modal-close" onclick="Admin.closeModal('modalImport')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Format kolom CSV: <code style="background:var(--sage-ghost); padding:2px 6px; border-radius:4px; font-size:11px;">kecamatan, wkt_geometry</code></p>
+        <p style="font-size:11px; color:#dc2626; margin-bottom:12px; font-weight:bold;">⚠️ Peringatan: Ukuran file maksimal 50 MB (Menghindari overload memori server).</p>
+        <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom:16px; font-size:13px;" />
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn-ghost" onclick="Admin.closeModal('modalImport')">Batal</button>
+          <button class="btn-primary" onclick="Admin.handleUploadSubmit()">Upload</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Unduh Data NDVI -->
+  <div id="modalDownload" class="modal-overlay hidden" onclick="if(event.target===this)Admin.closeModal('modalDownload')">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3>Unduh Data NDVI per Kecamatan</h3>
+        <button class="modal-close" onclick="Admin.closeModal('modalDownload')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">File CSV berisi data NDVI bulanan setiap kecamatan. Pilih tahun untuk memperkecil ukuran file.</p>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:6px;">Filter Tahun</label>
+          <select id="downloadTahun" style="width:100%; height:40px; background:#fff; color:var(--text-primary); border:1px solid var(--border-mid); border-radius:6px; font-size:13px; padding:0 12px;">
+            <option value="">Semua Tahun (Lengkap)</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="btn-ghost" onclick="Admin.closeModal('modalDownload')">Batal</button>
+          <button class="btn-primary" onclick="Admin.handleDownload()">Unduh CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js?v=v9" crossorigin></script>
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.19.2/dist/leaflet-geoman.min.js?v=v9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js?v=v9"></script>
+  <script src="./js/auth.js?v=v9"></script>
+  <script src="./js/data.js?v=v9"></script>
+  <script src="./js/map.js?v=v9"></script>
+  <script src="./js/charts.js?v=v9"></script>
+  <script src="./js/admin.js?v=v9"></script>
+  <script src="./js/app.js?v=v9"></script>
+
+</body>
+</html>
