@@ -4,7 +4,7 @@
  */
 
 const Admin = (() => {
-  const API = 'http://localhost:8000/api';
+  const API = '/api';
 
   // ══════════════════════════════════════════════════════
   // UNDUH DATA — MULTI-FORMAT

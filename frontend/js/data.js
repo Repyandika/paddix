@@ -4,7 +4,7 @@
  * Tidak ada logika UI di sini — hanya data access layer.
  */
 
-const API = 'http://localhost:8000/api';
+const API = '/api';
 
 // ─── Helpers ──────────────────────────────────────────
 function fmt(n, dec = 0) {
