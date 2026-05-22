@@ -95,38 +95,24 @@ def get_batas_geojson(
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 2. GET /api/geo/sawah
-#    GeoJSON poligon sawah per kecamatan (difilter + disederhanakan)
+#    GeoJSON poligon sawah per kecamatan (semua data, tanpa partial filtering)
 # ──────────────────────────────────────────────────────────────────────────────
 @router.get("/sawah", summary="GeoJSON Poligon Sawah per Kecamatan")
 def get_sawah_geojson(
     kecamatan: str = Query(..., description="Nama kecamatan"),
-    min_lng: Optional[float] = Query(None, description="BBox Min Longitude"),
-    min_lat: Optional[float] = Query(None, description="BBox Min Latitude"),
-    max_lng: Optional[float] = Query(None, description="BBox Max Longitude"),
-    max_lat: Optional[float] = Query(None, description="BBox Max Latitude"),
     db: Session = Depends(get_db),
 ):
     """
-    Mengembalikan GeoJSON poligon sawah untuk satu kecamatan.
-    Menggunakan simplifikasi geometri ringan (0.0001) untuk meningkatkan performa
-    transmisi data dan rendering di Leaflet.
-    Mendukung filter spasial Bounding Box (bbox) untuk efisiensi render.
+    Mengembalikan GeoJSON poligon sawah untuk satu kecamatan (SEMUA poligon, tanpa partial).
+    Menggunakan simplifikasi geometri (0.001) untuk performa optimal.
+    Response di-streaming sebagai JSON untuk kecepatan transmisi.
     """
-    bbox_filter = ""
     params = {"nama_kecamatan": kecamatan}
-    if min_lng is not None and min_lat is not None and max_lng is not None and max_lat is not None:
-        bbox_filter = "AND wkb_geometry && ST_MakeEnvelope(:min_lng, :min_lat, :max_lng, :max_lat, 4326)"
-        params.update({
-            "min_lng": min_lng,
-            "min_lat": min_lat,
-            "max_lng": max_lng,
-            "max_lat": max_lat
-        })
 
-    sql = text(f"""
+    sql = text("""
         SELECT
             ogc_fid,
-            ST_AsGeoJSON(ST_Simplify(wkb_geometry, 0.0001)) AS geometry,
+            ST_AsGeoJSON(ST_Simplify(wkb_geometry, 0.001)) AS geometry,
             luas_ha,
             id_sawah,
             kecamatan,
@@ -134,8 +120,7 @@ def get_sawah_geojson(
         FROM sawah_karawang
         WHERE wkb_geometry IS NOT NULL
           AND LOWER(TRIM(kecamatan)) = LOWER(TRIM(:nama_kecamatan))
-          {bbox_filter}
-        ORDER BY ogc_fid DESC
+        ORDER BY ogc_fid
     """)
 
     rows = db.execute(sql, params).fetchall()

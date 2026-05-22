@@ -4,7 +4,11 @@
  * Tidak ada logika UI di sini — hanya data access layer.
  */
 
-const API = '/api';
+const API = window.APP_CONFIG?.API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api'
+    : '/api'
+);
 
 // ─── Helpers ──────────────────────────────────────────
 function fmt(n, dec = 0) {
@@ -21,14 +25,15 @@ function fmtNdvi(v) {
 }
 
 /**
- * Tentukan indikasi risiko berdasarkan nilai NDVI rata-rata.
- * @returns {{ label: string, level: 'high'|'med'|'low'|'na' }}
+ * Klasifikasi kerapatan vegetasi berdasarkan NDVI (fenologi lahan sawah).
+ * @returns {{ label: string, level: 'high'|'med'|'ok'|'low'|'na', desc: string }}
  */
 function getRiskInfo(ndvi) {
-  if (ndvi === null || ndvi === undefined) return { label: 'Data Tidak Tersedia', level: 'na' };
-  if (ndvi < 0.25)  return { label: 'Risiko Tinggi', level: 'high' };
-  if (ndvi < 0.40)  return { label: 'Risiko Sedang', level: 'med' };
-  return { label: 'Normal / Aman', level: 'low' };
+  if (ndvi === null || ndvi === undefined) return { label: 'Data Tidak Tersedia', level: 'na', desc: 'Tidak ada data NDVI untuk periode ini.' };
+  if (ndvi < 0.2)  return { label: 'Kerapatan Sangat Rendah', level: 'high', desc: 'Indikasi fase bera atau penggenangan lahan awal sebelum masa tanam.' };
+  if (ndvi < 0.4)  return { label: 'Kerapatan Rendah',        level: 'med',  desc: 'Indikasi masa persemaian atau awal tanam dengan kanopi daun yang masih jarang.' };
+  if (ndvi < 0.6)  return { label: 'Kerapatan Sedang',        level: 'ok',   desc: 'Indikasi fase pertumbuhan vegetatif aktif.' };
+  return             { label: 'Kerapatan Tinggi',        level: 'low',  desc: 'Indikasi fase vegetatif maksimal atau kerapatan kanopi tertinggi menjelang masa generatif.' };
 }
 
 // ─── API Calls ─────────────────────────────────────────
@@ -62,12 +67,13 @@ async function fetchBatasGeoJSON(filters = {}) {
 }
 
 /**
- * GeoJSON poligon petak sawah per kecamatan (lazy — hanya saat diklik).
- * Limit default dikurangi agar performa aman; bisa dinaikkan.
+ * GeoJSON poligon petak sawah per kecamatan (ambil SEMUA poligon untuk kecamatan).
+ * Tidak menggunakan BBox filter agar semua poligon tercakup tanpa kehilangan data.
  */
-async function fetchSawahGeoJSON(kecamatan, limit = 5000) {
-  const params = new URLSearchParams({ kecamatan, limit });
-  const res = await fetch(`${API}/geo/sawah?${params}`);
+async function fetchSawahGeoJSON(kecamatan, limit = null, bbox = null, signal = null) {
+  const params = new URLSearchParams({ kecamatan, t: Date.now() });
+  const fetchOpts = signal ? { signal } : {};
+  const res = await fetch(`${API}/geo/sawah?${params}`, fetchOpts);
   if (!res.ok) throw new Error(`Gagal fetch sawah GeoJSON: ${kecamatan}`);
   return res.json();
 }
