@@ -105,9 +105,10 @@ def get_sawah_geojson(
     """
     Mengembalikan GeoJSON poligon sawah untuk satu kecamatan (SEMUA poligon, tanpa partial).
     Menggunakan simplifikasi geometri (0.001) untuk performa optimal.
-    Response di-streaming sebagai JSON untuk kecepatan transmisi.
+    Query di-optimize dengan indexed LOWER(TRIM()) lookup untuk kecepatan maksimal.
     """
-    params = {"nama_kecamatan": kecamatan}
+    kec_lower = kecamatan.lower().strip()
+    params = {"kec_lower": kec_lower}
 
     sql = text("""
         SELECT
@@ -119,7 +120,7 @@ def get_sawah_geojson(
             status_data
         FROM sawah_karawang
         WHERE wkb_geometry IS NOT NULL
-          AND LOWER(TRIM(kecamatan)) = LOWER(TRIM(:nama_kecamatan))
+          AND LOWER(TRIM(kecamatan)) = :kec_lower
         ORDER BY ogc_fid
     """)
 
