@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
@@ -100,15 +100,30 @@ def get_batas_geojson(
 @router.get("/sawah", summary="GeoJSON Poligon Sawah per Kecamatan")
 def get_sawah_geojson(
     kecamatan: str = Query(..., description="Nama kecamatan"),
-    limit: int = Query(50000, ge=1, le=120000, description="Maks jumlah poligon"),
+    min_lng: Optional[float] = Query(None, description="BBox Min Longitude"),
+    min_lat: Optional[float] = Query(None, description="BBox Min Latitude"),
+    max_lng: Optional[float] = Query(None, description="BBox Max Longitude"),
+    max_lat: Optional[float] = Query(None, description="BBox Max Latitude"),
     db: Session = Depends(get_db),
 ):
     """
     Mengembalikan GeoJSON poligon sawah untuk satu kecamatan.
-    Geometri disederhanakan (ST_Simplify) agar performa tetap baik
-    meskipun jumlah petak sangat banyak.
+    Menggunakan simplifikasi geometri ringan (0.0001) untuk meningkatkan performa
+    transmisi data dan rendering di Leaflet.
+    Mendukung filter spasial Bounding Box (bbox) untuk efisiensi render.
     """
-    sql = text("""
+    bbox_filter = ""
+    params = {"nama_kecamatan": kecamatan}
+    if min_lng is not None and min_lat is not None and max_lng is not None and max_lat is not None:
+        bbox_filter = "AND wkb_geometry && ST_MakeEnvelope(:min_lng, :min_lat, :max_lng, :max_lat, 4326)"
+        params.update({
+            "min_lng": min_lng,
+            "min_lat": min_lat,
+            "max_lng": max_lng,
+            "max_lat": max_lat
+        })
+
+    sql = text(f"""
         SELECT
             ogc_fid,
             ST_AsGeoJSON(ST_Simplify(wkb_geometry, 0.0001)) AS geometry,
@@ -117,24 +132,27 @@ def get_sawah_geojson(
             kecamatan,
             status_data
         FROM sawah_karawang
-        WHERE LOWER(kecamatan) = LOWER(:kecamatan)
-        LIMIT :limit
+        WHERE wkb_geometry IS NOT NULL
+          AND LOWER(TRIM(kecamatan)) = LOWER(TRIM(:nama_kecamatan))
+          {bbox_filter}
+        ORDER BY ogc_fid DESC
     """)
 
-    rows = db.execute(sql, {"kecamatan": kecamatan, "limit": limit}).fetchall()
+    rows = db.execute(sql, params).fetchall()
 
     features = []
     for row in rows:
-        features.append({
-            "type": "Feature",
-            "geometry": json.loads(row.geometry) if row.geometry else None,
-            "properties": {
-                "ogc_fid":     row.ogc_fid,
-                "luas_ha":     row.luas_ha,
-                "id_sawah":    float(row.id_sawah) if row.id_sawah else None,
-                "kecamatan":   row.kecamatan,
-                "status_data": row.status_data,
-            },
-        })
+        geom = row.geometry if row.geometry else "null"
+        ogc_fid = row.ogc_fid
+        luas_ha = row.luas_ha if row.luas_ha is not None else "null"
+        id_sawah = row.id_sawah if row.id_sawah is not None else "null"
+        kec = json.dumps(row.kecamatan)
+        status_data = json.dumps(row.status_data)
+        
+        feat = f'{{"type":"Feature","geometry":{geom},"properties":{{"ogc_fid":{ogc_fid},"luas_ha":{luas_ha},"id_sawah":{id_sawah},"kecamatan":{kec},"status_data":{status_data}}}}}'
+        features.append(feat)
 
-    return {"type": "FeatureCollection", "features": features}
+    features_json = ",".join(features)
+    result_json = f'{{"type":"FeatureCollection","features":[{features_json}]}}'
+
+    return Response(content=result_json, media_type="application/json")
