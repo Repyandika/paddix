@@ -4,7 +4,13 @@
  */
 
 const Admin = (() => {
-  const API = '/api';
+  const API = window.APP_CONFIG?.API_BASE || (
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:8000/api'
+      : '/api'
+  );
+  const AUTH_USERS_URL = window.APP_CONFIG?.endpoints?.authUsers || `${API}/auth/users`;
+  const AUTH_REGISTER_URL = window.APP_CONFIG?.endpoints?.authRegister || `${API}/auth/register`;
 
   // ══════════════════════════════════════════════════════
   // UNDUH DATA — MULTI-FORMAT
@@ -55,14 +61,27 @@ const Admin = (() => {
 
   // ── Helper: Download file dari API ──
   async function _fetchAndDownload(endpoint, filename) {
+    const token = Auth.getToken();
+    const headers = { 'Accept': '*/*' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    console.log('[Download] Endpoint:', endpoint);
+    console.log('[Download] Token ada:', !!token, '| Role:', Auth.getUser()?.role);
     try {
       const res = await fetch(`${API}${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${Auth.getToken()}` },
+        method: 'GET',
+        headers: headers,
       });
       if (!res.ok) {
         const errText = await res.text();
-        console.error('Download error:', res.status, errText);
-        throw new Error(`Server menolak (${res.status}). Pastikan Anda login sebagai admin dan server sudah di-restart.`);
+        console.error('[Download] Error', res.status, errText);
+        if (res.status === 401) {
+          alert('Sesi Anda telah berakhir. Silakan login ulang.');
+          Auth.logout();
+          return;
+        }
+        throw new Error(`Server menolak (${res.status}): ${errText}`);
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -92,11 +111,11 @@ const Admin = (() => {
     _fetchAndDownload(`/admin/ndvi/export-filtered${q}`, `ndvi_data_${tahun || 'semua'}.csv`);
   }
 
-  // ── Download 2: Ranking Risiko (CSV) ──
+  // ── Download 2: Ranking Kerapatan Vegetasi (CSV) ──
   function handleDownloadRanking() {
     const tahun = document.getElementById('downloadTahun')?.value || '';
     const q = tahun ? `?tahun=${tahun}` : '';
-    _fetchAndDownload(`/admin/ranking/export-csv${q}`, `ranking_risiko_${tahun || 'semua'}.csv`);
+    _fetchAndDownload(`/admin/ranking/export-csv${q}`, `kerapatan_vegetasi_${tahun || 'semua'}.csv`);
   }
 
   // ── Download 3: Laporan Analitik (Excel) ──
@@ -121,6 +140,12 @@ const Admin = (() => {
         headers: Auth.authHeadersMultipart(),
         body: formData,
       });
+      
+      if (res.status === 401) {
+        Auth.handle401Error('Token expired saat import CSV');
+        return false;
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Upload gagal');
       alert(data.detail + (data.errors?.length ? `\n\nError:\n${data.errors.join('\n')}` : ''));
@@ -131,73 +156,103 @@ const Admin = (() => {
     }
   }
 
-  // ══════════════════════════════════════════════════════
-  // KELOLA AKUN
-  // ══════════════════════════════════════════════════════
-  async function loadUsers() {
-    const res = await fetch(`${API}/auth/users`, { headers: Auth.authHeaders() });
-    if (!res.ok) return [];
-    return res.json();
-  }
 
-  async function addUser(username, password, role) {
-    const res = await fetch(`${API}/auth/register`, {
-      method: 'POST', headers: Auth.authHeaders(),
-      body: JSON.stringify({ username, password, role }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Gagal tambah user');
-    return data;
-  }
-
-  async function deleteUser(userId) {
-    const res = await fetch(`${API}/auth/users/${userId}`, {
-      method: 'DELETE', headers: Auth.authHeaders(),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Gagal hapus user');
-    return data;
-  }
 
   // ══════════════════════════════════════════════════════
   // CRUD POLIGON SAWAH
   // ══════════════════════════════════════════════════════
   async function deleteSawah(ogcFid) {
+    console.log('[API] DELETE /admin/sawah/' + ogcFid);
     const res = await fetch(`${API}/admin/sawah/${ogcFid}`, {
-      method: 'DELETE', headers: Auth.authHeaders(),
+      method: 'DELETE', 
+      headers: Auth.authHeaders(),
     });
+    console.log('[API] Response status:', res.status);
+    
+    if (res.status === 401) {
+      Auth.handle401Error('Token expired atau invalid saat menghapus polygon');
+      throw new Error('Session expired. Silakan login ulang.');
+    }
+    
     if (!res.ok) {
       let errTxt = 'Gagal hapus poligon (' + res.status + ')';
-      try { const data = await res.json(); errTxt = data.detail || errTxt; } catch(e){}
+      try { 
+        const data = await res.json(); 
+        errTxt = data.detail || errTxt;
+        console.error('[API] Error detail:', data);
+      } catch(e){}
       throw new Error(errTxt);
     }
-    return res.json();
+    const data = await res.json();
+    console.log('[API] Success response:', data);
+    return data;
   }
 
   async function updateSawahGeometry(ogcFid, geojsonGeometry) {
+    const token = Auth.getToken();
+    console.log('[API] Token available:', !!token);
+    if (token) {
+      console.log('[API] Token preview:', token.substring(0, 20) + '...');
+    }
+    console.log('[API] PUT /admin/sawah/' + ogcFid);
+    
+    const headers = Auth.authHeaders();
+    console.log('[API] Authorization header:', headers['Authorization'] ? 'Set' : 'NOT SET');
+    
     const res = await fetch(`${API}/admin/sawah/${ogcFid}`, {
-      method: 'PUT', headers: Auth.authHeaders(),
+      method: 'PUT', 
+      headers: headers,
       body: JSON.stringify({ geojson_geometry: geojsonGeometry }),
     });
+    console.log('[API] Response status:', res.status);
+    
+    if (res.status === 401) {
+      Auth.handle401Error('Token expired atau invalid saat update geometri');
+      throw new Error('Session expired. Silakan login ulang.');
+    }
+    
     if (!res.ok) {
       let errTxt = 'Gagal update geometri (' + res.status + ')';
-      try { const data = await res.json(); errTxt = data.detail || errTxt; } catch(e){}
+      try { 
+        const data = await res.json(); 
+        errTxt = data.detail || errTxt;
+        console.error('[API] Error detail:', data);
+      } catch(e){}
       throw new Error(errTxt);
     }
-    return res.json();
+    const data = await res.json();
+    console.log('[API] Success response:', data);
+    return data;
   }
 
   async function createSawah(kecamatan, luasHa, geojsonGeometry) {
+    console.log('[API] POST /admin/sawah - Kecamatan:', kecamatan);
+    console.log('[API] Geometry:', geojsonGeometry);
+    
     const res = await fetch(`${API}/admin/sawah`, {
-      method: 'POST', headers: Auth.authHeaders(),
+      method: 'POST', 
+      headers: Auth.authHeaders(),
       body: JSON.stringify({ kecamatan, luas_ha: luasHa, geojson_geometry: geojsonGeometry }),
     });
+    console.log('[API] Response status:', res.status);
+    
+    if (res.status === 401) {
+      Auth.handle401Error('Token expired atau invalid saat membuat polygon');
+      throw new Error('Session expired. Silakan login ulang.');
+    }
+    
     if (!res.ok) {
       let errTxt = 'Gagal tambah poligon (' + res.status + ')';
-      try { const data = await res.json(); errTxt = data.detail || errTxt; } catch(e){}
+      try { 
+        const data = await res.json(); 
+        errTxt = data.detail || errTxt;
+        console.error('[API] Error detail:', data);
+      } catch(e){}
       throw new Error(errTxt);
     }
-    return res.json();
+    const data = await res.json();
+    console.log('[API] Success response:', data);
+    return data;
   }
 
   // ══════════════════════════════════════════════════════
@@ -206,43 +261,7 @@ const Admin = (() => {
   function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
   function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-  async function renderUserModal() {
-    openModal('modalUsers');
-    const listEl = document.getElementById('userListBody');
-    listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8">Memuat...</td></tr>';
-    try {
-      const users = await loadUsers();
-      if (!users.length) { listEl.innerHTML = '<tr><td colspan="4" style="text-align:center">Tidak ada user.</td></tr>'; return; }
-      listEl.innerHTML = users.map(u => `
-        <tr>
-          <td>${u.id}</td>
-          <td><strong>${u.username}</strong></td>
-          <td><span class="role-badge role-${u.role}">${u.role}</span></td>
-          <td><button class="btn-danger-sm" onclick="Admin.handleDeleteUser(${u.id}, '${u.username}')">Hapus</button></td>
-        </tr>
-      `).join('');
-    } catch (e) {
-      listEl.innerHTML = `<tr><td colspan="4" style="color:#dc2626">${e.message}</td></tr>`;
-    }
-  }
 
-  async function handleDeleteUser(userId, username) {
-    if (!confirm(`Yakin ingin menghapus user "${username}"?`)) return;
-    try { await deleteUser(userId); renderUserModal(); } catch (e) { alert(e.message); }
-  }
-
-  async function handleAddUser() {
-    const username = document.getElementById('newUsername').value.trim();
-    const password = document.getElementById('newPassword').value;
-    const role = document.getElementById('newRole').value;
-    if (!username || !password) { alert('Username dan password wajib diisi'); return; }
-    try {
-      await addUser(username, password, role);
-      document.getElementById('newUsername').value = '';
-      document.getElementById('newPassword').value = '';
-      renderUserModal();
-    } catch (e) { alert(e.message); }
-  }
 
   function handleUploadClick() { openModal('modalImport'); }
 
@@ -260,7 +279,8 @@ const Admin = (() => {
     if (success) {
       closeModal('modalImport');
       fileInput.value = '';
-      if (window._reloadSawahLayer) window._reloadSawahLayer();
+      // Reload halaman agar dropdown filter (tahun, kecamatan, dll) terupdate
+      setTimeout(() => window.location.reload(), 500);
     }
   }
 
@@ -269,16 +289,23 @@ const Admin = (() => {
   // ══════════════════════════════════════════════════════
 
   function initGeoman(map) {
-    map.pm.addControls({
-      position: 'topleft',
-      drawCircle: false,
-      drawCircleMarker: false,
-      drawMarker: false,
-      drawPolyline: false,
-      drawRectangle: false,
-      drawText: false,
-      cutPolygon: false,
-      rotateMode: false,
+    // KITA MATIKAN NATIVE GEOMAN TOOLBAR AGAR TIDAK MUNCUL DI KIRI MAP
+    // map.pm.addControls({...});
+
+    // Binding tombol custom di Digitasi Toolbar
+    const btnDigiAdd = document.getElementById('btnDigiAdd');
+    if (btnDigiAdd) btnDigiAdd.addEventListener('click', () => {
+      map.pm.enableDraw('Polygon', { allowSelfIntersection: false });
+    });
+
+    const btnDigiCancelDraw = document.getElementById('btnDigiCancelDraw');
+    if (btnDigiCancelDraw) btnDigiCancelDraw.addEventListener('click', () => {
+      map.pm.disableDraw();
+    });
+
+    const btnDigiExit = document.getElementById('btnDigiExit');
+    if (btnDigiExit) btnDigiExit.addEventListener('click', () => {
+      exitDigitasiMode(map);
     });
 
     map.pm.setGlobalOptions({
@@ -288,24 +315,64 @@ const Admin = (() => {
         fillOpacity: 0.2,
         weight: 2,
       },
+      // ALLOW UNLIMITED POLYGON POINTS - no restriction on vertex count
+      minPolygonPoints: 3,
+    });
+
+    // ── Nonaktifkan hover tooltip saat mode Draw atau Edit Geoman aktif ──
+    // pm:globaldrawmodetoggled: langsung fire saat tombol draw di toolbar diklik
+    map.on('pm:globaldrawmodetoggled', (e) => {
+      if (window.MapManager) MapManager.setEditingMode(e.enabled);
+      
+      const btnAdd = document.getElementById('btnDigiAdd');
+      const btnCancel = document.getElementById('btnDigiCancelDraw');
+      if (e.enabled) {
+         if (btnAdd) btnAdd.classList.add('hidden');
+         if (btnCancel) btnCancel.classList.remove('hidden');
+      } else {
+         if (btnAdd) btnAdd.classList.remove('hidden');
+         if (btnCancel) btnCancel.classList.add('hidden');
+      }
+    });
+    // pm:globaleditmodetoggled: langsung fire saat tombol edit vertex di toolbar diklik
+    map.on('pm:globaleditmodetoggled', (e) => {
+      if (window.MapManager) MapManager.setEditingMode(e.enabled);
     });
 
     map.on('pm:create', async (e) => {
+      // Mode draw sudah selesai, hover akan aktif kembali setelah selesai proses
       const layer = e.layer;
       const geojson = layer.toGeoJSON().geometry;
 
-      const kecamatan = prompt('Nama Kecamatan untuk poligon baru ini:');
-      if (!kecamatan) {
+      const activeKec = (window._appState && window._appState.selectedKecamatan) || '';
+      let kecamatanInput = prompt('Konfirmasi Nama Kecamatan untuk poligon baru ini:', activeKec);
+      
+      if (!kecamatanInput) {
+        if (window.MapManager) MapManager.setEditingMode(false);
         map.removeLayer(layer);
         return;
       }
+      
+      const kecamatan = kecamatanInput.trim();
+      console.log('[Geoman] Menambah poligon baru:', { kecamatan, activeKec, geojson });
+
 
       try {
         const result = await createSawah(kecamatan, 0, geojson);
         alert(`Poligon berhasil ditambahkan (ID: ${result.ogc_fid})!\nLuas dihitung otomatis oleh server.`);
         map.removeLayer(layer);
+        if (window.MapManager) MapManager.setEditingMode(false);
+        
+        // Pastikan dropdown state terupdate jika menggambar di kecamatan lain
+        if (window._appState) {
+          window._appState.selectedKecamatan = kecamatan;
+          const dd = document.getElementById('filterKecamatan');
+          if (dd) dd.value = kecamatan;
+        }
+
         if (window._reloadSawahLayer) window._reloadSawahLayer();
       } catch (err) {
+        if (window.MapManager) MapManager.setEditingMode(false);
         alert('Gagal menyimpan: ' + err.message);
         map.removeLayer(layer);
       }
@@ -319,15 +386,17 @@ const Admin = (() => {
     window._editingLayer = layer;
     window._editingOgcFid = ogcFid;
 
+    // Nonaktifkan hover tooltip selama mode edit
+    if (window.MapManager) MapManager.setEditingMode(true);
+
     // Kunci map dragging agar tidak bergeser
     const map = window._map || (window.MapManager && window.MapManager.getMap());
     if (map) map.dragging.disable();
 
     layer.pm.enable({ allowSelfIntersection: false });
-    document.getElementById('geomanEditBar').classList.remove('hidden');
-    
-    const panel = document.getElementById('fullDashboardPanels');
-    if (panel) panel.classList.add('hidden');
+    // Tampilkan tombol "Selesai Edit"
+    const btnFinish = document.getElementById('btnDigiFinishEdit');
+    if (btnFinish) btnFinish.classList.remove('hidden');
   }
 
   function enableEditMode(map) {
@@ -338,24 +407,31 @@ const Admin = (() => {
     if (!window._editingLayer || !window._editingOgcFid) return;
 
     const geojson = window._editingLayer.toGeoJSON().geometry;
+    console.log('[Geoman] Menyimpan update geometri untuk OGC FID:', window._editingOgcFid);
+    console.log('[Geoman] Geometry data:', geojson);
+    console.log('[Geoman] Coordinate length:', geojson.coordinates[0].length);
+    
     try {
-      await updateSawahGeometry(window._editingOgcFid, geojson);
+      const result = await updateSawahGeometry(window._editingOgcFid, geojson);
+      console.log('[Admin] Save result:', result);
       alert(`Geometri poligon berhasil diperbarui!`);
       
       window._editingLayer.pm.disable();
       window._editingLayer = null;
       window._editingOgcFid = null;
-      document.getElementById('geomanEditBar').classList.add('hidden');
+      const btnFinish = document.getElementById('btnDigiFinishEdit');
+      if (btnFinish) btnFinish.classList.add('hidden');
       
+      // Aktifkan kembali hover tooltip
+      if (window.MapManager) MapManager.setEditingMode(false);
+
       // Buka kunci dragging map
       const map = window._map || (window.MapManager && window.MapManager.getMap());
       if (map) map.dragging.enable();
 
-      const panel = document.getElementById('fullDashboardPanels');
-      if (panel) panel.classList.remove('hidden');
-
       if (window._reloadSawahLayer) window._reloadSawahLayer();
     } catch (e) {
+      console.error('[Admin] Error saat menyimpan:', e);
       alert('Gagal menyimpan: ' + e.message);
     }
   }
@@ -367,14 +443,15 @@ const Admin = (() => {
       window._editingOgcFid = null;
     }
     
+    // Aktifkan kembali hover tooltip
+    if (window.MapManager) MapManager.setEditingMode(false);
+
     // Buka kunci dragging map
     const map = window._map || (window.MapManager && window.MapManager.getMap());
     if (map) map.dragging.enable();
 
-    document.getElementById('geomanEditBar').classList.add('hidden');
-    
-    const panel = document.getElementById('fullDashboardPanels');
-    if (panel) panel.classList.remove('hidden');
+    const btnFinish = document.getElementById('btnDigiFinishEdit');
+    if (btnFinish) btnFinish.classList.add('hidden');
 
     if (window._reloadSawahLayer) window._reloadSawahLayer();
   }
@@ -391,8 +468,12 @@ const Admin = (() => {
         if (!ogcFid) return;
         try {
           await deleteSawah(ogcFid);
+          // WAJIB panggil reload agar poligon hilang sepenuhnya & KPI update
+          if (window._reloadSawahLayer) window._reloadSawahLayer();
         } catch (err) {
           alert('Gagal hapus di server: ' + err.message);
+          // Jika gagal hapus, render ulang untuk mengembalikan poligon yang dihapus Geoman
+          if (window._reloadSawahLayer) window._reloadSawahLayer();
         }
       });
       window._removeListenerAttached = true;
@@ -401,15 +482,80 @@ const Admin = (() => {
     map.pm.enableGlobalRemovalMode();
   }
 
+  // Handle auto-save dari map.js
+  async function handlePolygonUpdate(ogcFid, geojson) {
+    console.log('[Geoman] Auto-saving geometri untuk OGC FID:', ogcFid);
+    try {
+      await updateSawahGeometry(ogcFid, geojson);
+      console.log(`[Admin] Berhasil menyimpan OGC FID ${ogcFid}`);
+      if (window._reloadSawahLayer) window._reloadSawahLayer();
+    } catch (e) {
+      console.error('[Admin] Error auto-save:', e);
+      alert('Gagal menyimpan otomatis: ' + e.message);
+    }
+  }
+
+  let _previousBasemap = null;
+  let _digitasiModeActive = false;
+
+  function isDigitasiModeActive() {
+    return _digitasiModeActive;
+  }
+
+  function enterDigitasiMode(map) {
+    if (!window._sawahLayerRef) {
+      alert("Silakan pilih kecamatan dan tampilkan layer Polygon Lahan Sawah terlebih dahulu!");
+      return;
+    }
+
+    _digitasiModeActive = true;
+    document.getElementById('digitasiToolbar').classList.remove('hidden');
+
+    if (window.MapManager) {
+      _previousBasemap = window.MapManager.getCurrentBasemap ? window.MapManager.getCurrentBasemap() : 'satelit';
+      window.MapManager.setBasemap('satelit');
+    }
+
+    const fsBtn = document.getElementById('btnFullscreenMap');
+    if (fsBtn && !document.querySelector('.map-container-wrapper').classList.contains('fullscreen-mode')) {
+      fsBtn.click();
+    }
+  }
+
+  function exitDigitasiMode(map) {
+    _digitasiModeActive = false;
+    if (!map) map = window._map || (window.MapManager && window.MapManager.getMap());
+    if (map && map.pm) {
+      map.pm.disableDraw();
+      map.pm.disableGlobalEditMode();
+      map.pm.disableGlobalRemovalMode();
+    }
+    
+    cancelAllEdits();
+
+    document.getElementById('digitasiToolbar').classList.add('hidden');
+
+    if (window.MapManager && _previousBasemap) {
+      window.MapManager.setBasemap(_previousBasemap);
+    }
+
+    const fsBtn = document.getElementById('btnFullscreenMap');
+    if (fsBtn && document.querySelector('.map-container-wrapper').classList.contains('fullscreen-mode')) {
+      fsBtn.click();
+    }
+
+    if (window.MapManager) MapManager.setEditingMode(false);
+  }
+
   return {
     openDownloadModal, handleDownload, handleDownloadNdvi, handleDownloadRanking, handleDownloadExcel,
     switchDownloadTab,
-    importCSV, loadUsers, addUser, deleteUser,
+    importCSV,
     deleteSawah, updateSawahGeometry, createSawah,
     openModal, closeModal,
-    renderUserModal, handleDeleteUser, handleAddUser,
     handleUploadClick, handleUploadSubmit,
     initGeoman, enableEditMode, enableEditModeForLayer, saveAllEdits, cancelAllEdits, enableRemoveMode,
+    handlePolygonUpdate, enterDigitasiMode, exitDigitasiMode, isDigitasiModeActive
   };
 })();
 

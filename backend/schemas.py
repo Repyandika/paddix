@@ -9,8 +9,8 @@ class NdviBase(BaseModel):
     periode:      str
     tahun:        int
     bulan:        int
-    mean_ndvi:    Optional[Decimal]
-    std_ndvi:     Optional[Decimal]
+    mean_ndvi:    Optional[float]
+    std_ndvi:     Optional[float]
     pixel_count:  Optional[int]
     jumlah_citra: Optional[int]
     kategori:     Optional[str]

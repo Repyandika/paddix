@@ -124,15 +124,14 @@ body {
   z-index: 1000;
   box-shadow: 0 2px 12px rgba(0,0,0,.18);
 }
-
 .topbar-container {
-  max-width: 1600px;
+  max-width: 100%;
   margin: 0 auto;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 24px 0 10px;
 }
 
 .topbar-brand { display: flex; align-items: center; gap: 14px; }
@@ -217,7 +216,7 @@ select option {
 ═══════════════════════════════════════════════ */
 .status-bar {
   background: var(--forest-mid);
-  padding: 5px 24px;
+  padding: 5px 24px 5px 10px;
   font-size: 11px;
   font-family: var(--font-mono);
   display: flex;
@@ -579,7 +578,7 @@ html {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .chart-wrapper       { position: relative; width: 100%; height: 260px; }
@@ -628,9 +627,10 @@ html {
   text-transform: uppercase;
 }
 
-.risk-badge.high { background: var(--red-light);   color: var(--red-risk);  border: 1px solid #fca5a5; }
-.risk-badge.med  { background: var(--amber-light);  color: var(--amber);     border: 1px solid var(--amber-border); }
-.risk-badge.low  { background: var(--sage-ghost);   color: var(--sage);      border: 1px solid var(--sage-border); }
+.risk-badge.high { background: #fef3c7; color: #b45309; border: 1px solid #fbbf24; } /* Kerapatan Sangat Rendah — coklat */
+.risk-badge.med  { background: #fff7ed; color: #ea580c; border: 1px solid #fdba74; } /* Kerapatan Rendah — oranye */
+.risk-badge.ok   { background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; } /* Kerapatan Sedang — hijau muda */
+.risk-badge.low  { background: #dcfce7; color: #166534; border: 1px solid #4ade80; } /* Kerapatan Tinggi — hijau tua */
 .risk-badge.na   { background: #f1f5f9; color: var(--text-muted); border: 1px solid var(--border-mid); }
 
 .detail-table {
@@ -867,9 +867,9 @@ html {
 }
 
 .admin-toolbar-inner {
-  max-width: 1600px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 24px 0 10px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -914,17 +914,51 @@ html {
   color: #fff;
 }
 
-/* ═══════════════════════════════════════════════
-   DRAW TOOLBAR (gambar poligon baru)
-═══════════════════════════════════════════════ */
 .draw-toolbar {
-  background: rgba(220,38,38,.9);
-  backdrop-filter: blur(8px);
-  padding: 8px 24px;
+  background: rgba(6, 78, 59, 0.85); /* Premium forest green */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 24px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   justify-content: center;
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.draw-toolbar .toolbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+
+.draw-toolbar .admin-btn {
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.draw-toolbar .admin-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  filter: brightness(1.1);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1258,4 +1292,587 @@ select option:hover {
   border-top-right-radius: 20px;
   box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
   padding-top: 24px;
+}
+
+/* Floating Zoom Warning */
+.map-zoom-warning {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(220, 38, 38, 0.95); /* Red warning */
+  backdrop-filter: blur(8px);
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  box-shadow: var(--shadow-float);
+  transition: opacity 0.3s ease;
+}
+
+/* ═══════════════════════════════════════════════════
+   LABEL NAMA KECAMATAN (Permanent Tooltip di Peta)
+═══════════════════════════════════════════════════ */
+.kec-label-tooltip {
+  background: rgba(10, 20, 10, 0.72) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none !important;
+  border-radius: 5px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45) !important;
+  color: #ffffff !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  padding: 3px 8px !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] select, [data-theme="dark"] option {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .map-floating-legend, 
+[data-theme="dark"] .control-card {
+  background: rgba(18, 24, 39, 0.95);
+  border-color: var(--border-light);
+}
+
+[data-theme="dark"] .map-floating-legend h4,
+[data-theme="dark"] .control-card .control-title {
+  color: var(--text-primary);
+}
+
+.trend-up {
+  color: #22c55e;
+  font-weight: 700;
+  font-size: 12px;
+}
+.trend-down {
+  color: #ef4444;
+  font-weight: 700;
+  font-size: 12px;
+}
+.trend-flat {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ═══════════════════════════════════════════════
+   DOWNLOAD TAB BUTTONS
+═══════════════════════════════════════════════ */
+.dl-tab-btn {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+.dl-tab-btn:hover {
+  background: var(--sage-ghost) !important;
+  color: var(--forest) !important;
+}
+.dl-tab-btn.active {
+  background: var(--forest) !important;
+  color: #fff !important;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ═══════════════════════════════════════════════
+   SELECT DROPDOWN GLOBAL OPTIMIZATION
+═══════════════════════════════════════════════ */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b8f6b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px !important;
+  background-color: #fff;
+  color: var(--text-primary);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+select:hover {
+  border-color: var(--sage);
+}
+select:focus {
+  outline: none;
+  border-color: var(--sage);
+  box-shadow: 0 0 0 3px rgba(74,124,89,0.15);
+}
+select option {
+  background: #fff;
+  color: var(--text-primary);
+  padding: 8px;
+}
+select option:checked,
+select option:hover {
+  background: var(--sage-ghost);
+  color: var(--forest);
+}
+/* Fullscreen Map Toggle */
+.map-container-wrapper.fullscreen-mode {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.map-container-wrapper.fullscreen-mode #map {
+  border-radius: 0 !important;
+  border: none !important;
+}
+
+.btn-fullscreen {
+  position: absolute;
+  top: 14px;
+  left: 54px;
+  z-index: 1000;
+  background: white;
+  border: none;
+  border-radius: 2px;
+  padding: 6px;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .btn-fullscreen {
+  background: #1e293b;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.btn-fullscreen:hover {
+  background: #f4f4f4;
+  transform: scale(1.05);
+}
+
+[data-theme="dark"] .btn-fullscreen:hover {
+  background: #334155;
+}
+
+/* Dashboard Panels Overlay */
+#fullDashboardPanels {
+  position: relative;
+  z-index: 20;
+  background-color: var(--bg-body);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+  padding-top: 24px;
+}
+
+/* Floating Zoom Warning */
+.map-zoom-warning {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(220, 38, 38, 0.95); /* Red warning */
+  backdrop-filter: blur(8px);
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  box-shadow: var(--shadow-float);
+  transition: opacity 0.3s ease;
+}
+
+/* ═══════════════════════════════════════════════════
+   LABEL NAMA KECAMATAN (Permanent Tooltip di Peta)
+═══════════════════════════════════════════════════ */
+.kec-label-tooltip {
+  background: rgba(10, 20, 10, 0.72) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none !important;
+  border-radius: 5px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45) !important;
+  color: #ffffff !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  padding: 3px 8px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+/* Sembunyikan panah/ekor tooltip bawaan Leaflet */
+.kec-label-tooltip::before {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COORDINATE SEARCH WIDGET
+   Floating widget — pojok bawah kiri peta
+═══════════════════════════════════════════════════════════ */
+
+.coord-search-widget {
+  position: absolute;
+  bottom: 32px;
+  left: 16px;
+  z-index: 1000;
+  width: 240px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.coord-search-widget:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* Header baris judul + toggle */
+.coord-search-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #374151;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: default;
+}
+
+.coord-search-header svg {
+  flex-shrink: 0;
+  color: #4ade80;
+}
+
+.coord-search-header span {
+  flex: 1;
+}
+
+/* Tombol collapse ▼ / ▲ */
+.coord-search-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: #9ca3af;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.coord-search-toggle:hover {
+  color: #374151;
+  background: rgba(0,0,0,0.06);
+}
+
+/* Body (collapsible) */
+.coord-search-body {
+  padding: 10px 12px 10px;
+}
+
+.coord-search-body.hidden {
+  display: none;
+}
+
+/* Baris input + tombol kirim */
+.coord-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.coord-search-input {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.coord-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.coord-search-input:focus {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+
+/* Tombol send */
+.coord-search-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #166534;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.coord-search-btn:hover  { background: #15803d; transform: scale(1.06); }
+.coord-search-btn:active { background: #14532d; transform: scale(0.97); }
+
+/* Pesan error */
+.coord-search-error {
+  display: none;
+  margin: 6px 0 2px;
+  font-size: 10.5px;
+  color: #dc2626;
+  line-height: 1.4;
+}
+
+/* Hint teks di bawah */
+.coord-search-hint {
+  margin: 5px 0 0;
+  font-size: 10px;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.coord-search-hint code {
+  font-family: 'DM Mono', monospace;
+  background: rgba(0,0,0,0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9.5px;
+}
+
+/* ─── Dark Theme ──────────────────────────────────────────── */
+[data-theme="dark"] .coord-search-widget {
+  background: rgba(18, 24, 39, 0.92);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .coord-search-header {
+  color: #e2e8f0;
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme="dark"] .coord-search-toggle {
+  color: #64748b;
+}
+[data-theme="dark"] .coord-search-toggle:hover {
+  color: #e2e8f0;
+  background: rgba(255,255,255,0.07);
+}
+
+[data-theme="dark"] .coord-search-input {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.12);
+  color: #f1f5f9;
+}
+[data-theme="dark"] .coord-search-input::placeholder { color: #475569; }
+[data-theme="dark"] .coord-search-hint  { color: #475569; }
+[data-theme="dark"] .coord-search-hint code { background: rgba(255,255,255,0.07); }
+
+/* ─── Marker Animasi ──────────────────────────────────────── */
+.coord-search-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.coord-search-marker-pin {
+  position: absolute;
+  inset: 4px;
+  background: #4ade80;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(74, 222, 128, 0.5);
+  z-index: 2;
+}
+
+.coord-search-marker-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.35);
+  animation: coord-pulse 1.8s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes coord-pulse {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  70%  { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(0.6); opacity: 0; }
+}
+
+/* ─── Google Maps Pin (menggantikan dot hijau lama) ───────── */
+.csm-wrap {
+  position: relative;
+  display: inline-block;
+}
+.csm-pin {
+  display: block;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.35));
+  animation: csm-drop 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.csm-shadow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.22);
+  filter: blur(2px);
+}
+@keyframes csm-drop {
+  from { opacity: 0; transform: translateY(-18px) scale(0.8); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);   }
+}
+
+/* ─── Panel Hasil Koordinat ───────────────────────────────── */
+.coord-result-panel {
+  margin-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.07);
+  padding-top: 10px;
+}
+
+.coord-result-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.coord-result-name {
+  flex: 1;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.coord-result-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.coord-result-clear:hover {
+  color: #ef4444;
+  background: rgba(239,68,68,0.08);
+}
+
+.coord-result-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.coord-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.coord-result-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.coord-result-value {
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  color: #334155;
+  text-align: right;
+}
+
+/* Dark theme result panel */
+[data-theme="dark"] .coord-result-panel {
+  border-top-color: rgba(255,255,255,0.07);
+}
+[data-theme="dark"] .coord-result-name  { color: #e2e8f0; }
+[data-theme="dark"] .coord-result-value { color: #cbd5e1; }
+[data-theme="dark"] .coord-result-label { color: #475569; }
+
+/* ─── Badge Kecamatan di Panel Hasil ──────────────────────── */
+.coord-result-kec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 4px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #166534;
+  background: rgba(22, 101, 52, 0.10);
+  border: 1px solid rgba(22, 101, 52, 0.25);
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+  animation: badge-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes badge-pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+[data-theme="dark"] .coord-result-kec-badge {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.10);
+  border-color: rgba(74, 222, 128, 0.25);
 }

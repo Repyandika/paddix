@@ -30,7 +30,7 @@ const Auth = (() => {
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
   }
 
   /**
@@ -64,9 +64,21 @@ const Auth = (() => {
     };
   }
 
+  /**
+   * Helper: Handle 401 Unauthorized errors
+   * Logout user dan redirect ke login page
+   */
+  function handle401Error(errorMessage = "") {
+    console.error('[Auth] 401 Unauthorized error:', errorMessage);
+    alert('Sesi Anda telah berakhir atau tidak valid. Silakan login kembali untuk melanjutkan.');
+    console.log('[Auth] Logging out user...');
+    logout();
+  }
+
   return {
     getToken, getUser, isLoggedIn, isAdmin,
     logout, checkAuth, authHeaders, authHeadersMultipart,
+    handle401Error,
   };
 })();
 

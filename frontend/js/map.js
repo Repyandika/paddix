@@ -16,21 +16,29 @@ const MapManager = (() => {
   let _fillOpacity = 0.65;
   let _activeLayer = 'kecamatan'; // 'kecamatan' | 'sawah'
   let _highlighted = null;  // layer yang sedang di-hover
+  let _editingMode = false; // true saat mode edit/draw Geoman aktif
+
+  // Cek langsung apakah Geoman sedang aktif (draw atau edit vertex)
+  function _isGeomanActive() {
+    if (_editingMode) return true;
+    if (_map && _map.pm) {
+      if (_map.pm.globalDrawModeEnabled()) return true;
+      if (_map.pm.globalEditModeEnabled()) return true;
+    }
+    return false;
+  }
 
   // Callbacks — diisi oleh app.js
   let _onKecamatanClick = null;
   let _onPetakClick = null;
 
-  // ─── Warna NDVI ──────────────────────────────────
+  // ─── Warna NDVI (4 band — Fenologi Kerapatan Vegetasi) ───
   function getNdviColor(v) {
-    if (v === null || v === undefined) return '#94a3b8';
-    if (v > 0.65) return '#166534';
-    if (v > 0.55) return '#16a34a';
-    if (v > 0.45) return '#22c55e';
-    if (v > 0.35) return '#84cc16';
-    if (v > 0.25) return '#eab308';
-    if (v > 0.15) return '#f97316';
-    return '#dc2626';
+    if (v === null || v === undefined) return '#94a3b8'; // abu — tidak ada data
+    if (v >= 0.6) return '#166534';  // Kerapatan Tinggi   — hijau tua
+    if (v >= 0.4) return '#4ade80';  // Kerapatan Sedang   — hijau muda
+    if (v >= 0.2) return '#f97316';  // Kerapatan Rendah   — oranye
+    return '#b45309';                // Kerapatan Sangat Rendah — coklat
   }
 
   // Warna petak sawah berdasarkan ukuran luas
@@ -49,7 +57,7 @@ const MapManager = (() => {
     const isFill = _activeMode === 'fill';
     return {
       color: '#ffffff',
-      weight: 1.5,
+      weight: 2.5,
       opacity: 0.9,
       fillColor: getNdviColor(ndvi),
       fillOpacity: isFill ? _fillOpacity : 0,
@@ -60,7 +68,7 @@ const MapManager = (() => {
   function kecHighlightStyle(feature) {
     return {
       ...kecStyle(feature),
-      weight: 3,
+      weight: 4,
       color: '#1e3a8a',
     };
   }
@@ -114,6 +122,39 @@ const MapManager = (() => {
         pane: 'overlayPane',
       }
     ).addTo(_map);
+
+    // Event listener: refresh visible sawah polygons on pan/zoom
+    // Guard: jangan reload saat Geoman draw/edit aktif (mencegah map jump)
+    _map.on('moveend', () => {
+      if (_activeLayer === 'sawah' && !_editingMode && !_isGeomanActive() && typeof window._triggerSawahLoad === 'function') {
+        window._triggerSawahLoad();
+      }
+    });
+
+    // Fitur QGIS-style: Geser map menggunakan klik tengah (Scroll Wheel Button)
+    _map.getContainer().addEventListener('mousedown', function(e) {
+      if (e.button === 1) { // Tombol tengah mouse (Middle Click)
+        e.preventDefault();
+        _map.dragging.disable(); 
+        let startPoint = [e.clientX, e.clientY];
+        
+        function onMouseMove(e2) {
+          let currentPoint = [e2.clientX, e2.clientY];
+          let offset = [startPoint[0] - currentPoint[0], startPoint[1] - currentPoint[1]];
+          _map.panBy(offset, {animate: false});
+          startPoint = currentPoint;
+        }
+        
+        function onMouseUp() {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          _map.dragging.enable();
+        }
+        
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      }
+    });
   }
 
   // ─── Batas Kecamatan ─────────────────────────────
@@ -129,6 +170,7 @@ const MapManager = (() => {
         // Hover
         layer.on('mouseover', (e) => {
           if (_activeLayer === 'sawah') return;
+          if (_isGeomanActive()) return; // ← sembunyikan saat Geoman aktif
 
           if (_highlighted) _highlighted.setStyle(kecStyle(_highlighted.feature));
           _highlighted = layer;
@@ -145,6 +187,7 @@ const MapManager = (() => {
 
         layer.on('mouseout', () => {
           if (_activeLayer === 'sawah') return;
+          if (_isGeomanActive()) return;
 
           if (_highlighted === layer) {
             layer.setStyle(kecStyle(feature));
@@ -154,6 +197,7 @@ const MapManager = (() => {
 
         // Click
         layer.on('click', () => {
+          if (_isGeomanActive()) return; // ← jangan proses klik kecamatan saat Geoman draw/edit aktif
           if (_onKecamatanClick) _onKecamatanClick(feature.properties);
         });
       },
@@ -185,6 +229,7 @@ const MapManager = (() => {
 
         // Hover tooltip
         layer.on('mouseover', (e) => {
+          if (_isGeomanActive()) return; // ← sembunyikan saat Geoman aktif
           const luas = p.luas_ha ? p.luas_ha.toFixed(3) : '–';
           const ukuran = p.luas_ha <= 0.5 ? 'Kecil' : p.luas_ha <= 1 ? 'Sedang' : 'Besar';
           layer.bindTooltip(
@@ -195,43 +240,55 @@ const MapManager = (() => {
         });
 
         layer.on('mouseout', () => {
+          if (_isGeomanActive()) return;
           layer.setStyle(petakStyle(feature));
+        });
+
+        // Auto-save edit geometry (terpicu saat vertex digeser di mode Global Edit)
+        layer.on('pm:update', async (e) => {
+          if (window.Admin && window.Admin.handlePolygonUpdate) {
+            window.Admin.handlePolygonUpdate(feature.properties.ogc_fid, e.layer.toGeoJSON().geometry);
+          }
         });
 
         // Click
         layer.on('click', (e) => {
           L.DomEvent.stop(e);
 
-          // Admin buttons
-          const isAdmin = window.Auth && Auth.isAdmin();
-          const adminBtns = isAdmin ? `
-            <div style="display:flex; gap:6px; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:8px;">
-              <button onclick="Admin.enableEditModeForLayer(MapManager.getLayerByOgcFid(${p.ogc_fid}), ${p.ogc_fid}); MapManager.getMap().closePopup();" style="flex:1; height:26px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; color:#2563eb; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Edit Geometri</button>
-              <button onclick="MapManager.deleteAndRefresh(${p.ogc_fid})" style="flex:1; height:26px; border:1px solid #fca5a5; border-radius:4px; background:#fee2e2; color:#dc2626; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Hapus</button>
-            </div>
-          ` : '';
-
-          const popupContent = `
-            <div style="font-family:'DM Sans', system-ui, sans-serif; font-size:12px; min-width:180px;">
-              <h4 style="margin:0 0 8px 0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">Detail Lahan (ID: ${p.id_sawah || 'NA'})</h4>
-              <div style="display:flex; justify-content:space-between; margin-bottom:4px">
-                <span style="color:#64748b">Luas:</span> <strong style="color:#2563eb">${p.luas_ha ? p.luas_ha.toFixed(3) + ' Ha' : '–'}</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between; margin-bottom:4px">
-                <span style="color:#64748b">Wilayah:</span> <strong>${p.kecamatan || '–'}</strong>
-              </div>
-              <div style="display:flex; justify-content:space-between; margin-bottom:4px">
-                <span style="color:#64748b">OGC FID:</span> <strong>${p.ogc_fid || '–'}</strong>
-              </div>
-              ${adminBtns}
-            </div>
-          `;
-          L.popup({ closeButton: true })
-            .setLatLng(e.latlng)
-            .setContent(popupContent)
-            .openOn(_map);
-
+          if (_isGeomanActive() || _editingMode) return;
+          const p = feature.properties;
           if (_onPetakClick) _onPetakClick(p);
+
+          // Tampilkan popup Edit/Hapus HANYA saat Mode Digitasi aktif
+          if (window.Admin && window.Admin.isDigitasiModeActive && window.Admin.isDigitasiModeActive()) {
+            const isAdmin = window.Auth && Auth.isAdmin();
+            const adminBtns = isAdmin ? `
+              <div style="display:flex; gap:6px; margin-top:10px; border-top:1px solid #e2e8f0; padding-top:8px;">
+                <button onclick="Admin.enableEditModeForLayer(MapManager.getLayerByOgcFid(${p.ogc_fid}), ${p.ogc_fid}); MapManager.getMap().closePopup();" style="flex:1; height:26px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; color:#2563eb; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Edit Geometri</button>
+                <button onclick="MapManager.deleteAndRefresh(${p.ogc_fid})" style="flex:1; height:26px; border:1px solid #fca5a5; border-radius:4px; background:#fee2e2; color:#dc2626; font-size:10px; font-weight:700; cursor:pointer; font-family:inherit;">Hapus</button>
+              </div>
+            ` : '';
+
+            const popupContent = `
+              <div style="font-family:'DM Sans', system-ui, sans-serif; font-size:12px; min-width:180px;">
+                <h4 style="margin:0 0 8px 0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">Detail Lahan (ID: ${p.id_sawah || 'NA'})</h4>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                  <span style="color:#64748b">Luas:</span> <strong style="color:#2563eb">${p.luas_ha ? p.luas_ha.toFixed(3) + ' Ha' : '–'}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                  <span style="color:#64748b">Wilayah:</span> <strong>${p.kecamatan || '–'}</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                  <span style="color:#64748b">OGC FID:</span> <strong>${p.ogc_fid || '–'}</strong>
+                </div>
+                ${adminBtns}
+              </div>
+            `;
+            L.popup({ closeButton: true })
+              .setLatLng(e.latlng)
+              .setContent(popupContent)
+              .openOn(_map);
+          }
         });
       },
     }).addTo(_map);
@@ -287,6 +344,26 @@ const MapManager = (() => {
 
   function getMap() { return _map; }
 
+  function setEditingMode(active) {
+    _editingMode = active;
+    if (active) {
+      // Reset highlight style
+      if (_highlighted) {
+        _highlighted.setStyle(kecStyle(_highlighted.feature));
+        _highlighted = null;
+      }
+      // UNBIND semua tooltip dari setiap layer individu (bukan hanya close group)
+      if (_batasLayer) {
+        _batasLayer.eachLayer(l => { l.unbindTooltip(); l.closeTooltip(); });
+      }
+      if (_sawahLayer) {
+        _sawahLayer.eachLayer(l => { l.unbindTooltip(); l.closeTooltip(); });
+      }
+      // Tutup popup yang mungkin masih terbuka
+      if (_map) _map.closePopup();
+    }
+  }
+
   function getLayerByOgcFid(ogcFid) {
     let target = null;
     if (_sawahLayer) {
@@ -309,10 +386,53 @@ const MapManager = (() => {
     }
   }
 
+  function zoomToKecamatan(kecName) {
+    if (!_batasLayer || !_map || !kecName) return false;
+    let found = false;
+    _batasLayer.eachLayer((layer) => {
+      if (layer.feature && layer.feature.properties && layer.feature.properties.kecamatan) {
+        if (layer.feature.properties.kecamatan.toLowerCase().trim() === kecName.toLowerCase().trim()) {
+          _map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+          found = true;
+        }
+      }
+    });
+    return found;
+  }
+
+  function getVisibleBBox() {
+    if (!_map) return null;
+    const bounds = _map.getBounds();
+    const southWest = bounds.getSouthWest();
+    const northEast = bounds.getNorthEast();
+    return {
+      min_lng: southWest.lng,
+      min_lat: southWest.lat,
+      max_lng: northEast.lng,
+      max_lat: northEast.lat
+    };
+  }
+
+  function getCurrentZoom() {
+    return _map ? _map.getZoom() : 0;
+  }
+
+  function clearSawahPolygonsOnly() {
+    if (_sawahLayer) {
+      _map.removeLayer(_sawahLayer);
+      _sawahLayer = null;
+    }
+    window._sawahLayerRef = null;
+    if (_batasLayer) {
+      _batasLayer.setStyle(kecStyle);
+    }
+  }
+
   return {
     init, renderBatas, renderSawah, clearSawahLayer,
     setMode, setOpacity, fitBatas, getMap, getNdviColor,
-    getLayerByOgcFid, deleteAndRefresh,
+    getLayerByOgcFid, deleteAndRefresh, setEditingMode,
+    zoomToKecamatan, getVisibleBBox, getCurrentZoom, clearSawahPolygonsOnly,
   };
 })();
 

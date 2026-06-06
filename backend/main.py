@@ -65,7 +65,12 @@ app = FastAPI(
 # ──────────────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,11 +87,11 @@ app.include_router(admin.router)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Static Files & Dashboard
+# Static Files & Dashboard (Serve directly from frontend/)
 # ──────────────────────────────────────────────────────────────────────────────
-static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-if os.path.isdir(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+if os.path.isdir(frontend_dir):
+    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 @app.get("/", tags=["Dashboard"])
 def redirect_to_dashboard():
@@ -103,3 +108,8 @@ def api_root():
         "version": "2.0.0",
         "docs": "/docs",
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)

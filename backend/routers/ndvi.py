@@ -271,30 +271,34 @@ def get_heatmap_matrix(
 @router.get("/dashboard/yoy", summary="YoY Comparison per Kecamatan")
 def get_yoy_comparison(db: Session = Depends(get_db)):
     """
-    Mengembalikan rata-rata NDVI 3 tahun terakhir per kecamatan.
+    Mengembalikan rata-rata NDVI tahunan per kecamatan secara dinamis.
     Cocok untuk Vertical Grouped Bar Chart.
     """
     from sqlalchemy import text
+    from collections import defaultdict
+    
     sql = text("""
-        SELECT 
-            kecamatan,
-            AVG(CASE WHEN tahun = 2023 THEN mean_ndvi END) as y2023,
-            AVG(CASE WHEN tahun = 2024 THEN mean_ndvi END) as y2024,
-            AVG(CASE WHEN tahun = 2025 THEN mean_ndvi END) as y2025
+        SELECT kecamatan, tahun, AVG(mean_ndvi) as avg_ndvi 
         FROM ndvi_kecamatan
-        WHERE tahun IN (2023, 2024, 2025)
-        GROUP BY kecamatan
-        ORDER BY kecamatan
+        WHERE mean_ndvi IS NOT NULL
+        GROUP BY kecamatan, tahun
+        ORDER BY kecamatan, tahun
     """)
     rows = db.execute(sql).fetchall()
-    return [
-        {
-            "kecamatan": r.kecamatan, 
-            "2023": r.y2023, 
-            "2024": r.y2024, 
-            "2025": r.y2025
-        } for r in rows
-    ]
+    
+    res = defaultdict(dict)
+    all_years = set()
+    for r in rows:
+        kec = r.kecamatan
+        yr = str(r.tahun)
+        res[kec]["kecamatan"] = kec
+        res[kec][yr] = float(r.avg_ndvi) if r.avg_ndvi else 0
+        all_years.add(yr)
+        
+    return {
+        "years": sorted(list(all_years)),
+        "data": list(res.values())
+    }
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 10. GET /api/ndvi/{kecamatan}

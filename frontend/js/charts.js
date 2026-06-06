@@ -71,18 +71,18 @@ const Charts = (() => {
 
     const values = data.map((d) => d.mean_ndvi ?? null);
 
-    // Garis warning di 0.25 (ambang risiko tinggi → sedang)
+    // Garis referensi di 0.2 (ambang Kerapatan Sangat Rendah → Rendah)
     const warningLine = {
       id: 'warningLine',
       beforeDraw(chart) {
         const { ctx, chartArea, scales } = chart;
         if (!chartArea) return;
-        const y = scales.y.getPixelForValue(0.25);
+        const y = scales.y.getPixelForValue(0.2);
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(chartArea.left, y);
         ctx.lineTo(chartArea.right, y);
-        ctx.strokeStyle = 'rgba(239,68,68,0.4)';
+        ctx.strokeStyle = 'rgba(180,83,9,0.45)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
@@ -100,10 +100,10 @@ const Charts = (() => {
           borderColor: '#2563eb',
           backgroundColor: 'rgba(37, 99, 235, 0.08)',
           borderWidth: 2,
-          // Highlight anomali: merah & besar jika NDVI < 0.25
-          pointRadius: (ctx) => { const v = ctx.parsed.y; return (v !== null && v < 0.25) ? 6 : 3; },
-          pointHoverRadius: (ctx) => { const v = ctx.parsed.y; return (v !== null && v < 0.25) ? 8 : 5; },
-          pointBackgroundColor: (ctx) => { const v = ctx.parsed.y; return (v !== null && v < 0.25) ? '#dc2626' : '#2563eb'; },
+          // Highlight: coklat & besar jika Kerapatan Sangat Rendah (< 0.2)
+          pointRadius: (ctx) => { const v = ctx.parsed.y; return (v !== null && v < 0.2) ? 6 : 3; },
+          pointHoverRadius: (ctx) => { const v = ctx.parsed.y; return (v !== null && v < 0.2) ? 8 : 5; },
+          pointBackgroundColor: (ctx) => { const v = ctx.parsed.y; return (v !== null && v < 0.2) ? '#b45309' : '#2563eb'; },
           fill: true,
           tension: 0.35,
           spanGaps: false, // JEDA TERLIHAT JIKA DATA NULL
@@ -134,9 +134,10 @@ const Charts = (() => {
               label: (ctx) => {
                 const v = ctx.parsed.y;
                 if (v === null || isNaN(v)) return ' Data Tidak Tersedia (Gap)';
-                let st = 'Aman';
-                if (v < 0.25) st = 'Kritis/Gagal Panen';
-                else if (v < 0.4) st = 'Waspada';
+                let st = 'Kerapatan Tinggi';
+                if (v < 0.2)  st = 'Kerapatan Sangat Rendah — Bera/Penggenangan';
+                else if (v < 0.4) st = 'Kerapatan Rendah — Persemaian/Awal Tanam';
+                else if (v < 0.6) st = 'Kerapatan Sedang — Vegetatif Aktif';
                 return ` NDVI: ${v.toFixed(3)} (${st})`;
               },
             },
@@ -155,10 +156,15 @@ const Charts = (() => {
     if (!data || !data.length) return;
 
     const colorMap = {
-      'risiko_tinggi': '#dc2626',    // Merah
-      'risiko_sedang': '#f97316',    // Oranye
-      'normal_/_aman': '#22c55e',    // Hijau
-      'data_tidak_tersedia': '#94a3b8'
+      'kerapatan_sangat_rendah': '#b45309',  // Coklat
+      'kerapatan_rendah':        '#f97316',  // Oranye
+      'kerapatan_sedang':        '#4ade80',  // Hijau muda
+      'kerapatan_tinggi':        '#166534',  // Hijau tua
+      // fallback untuk data lama dari DB
+      'risiko_tinggi':           '#b45309',
+      'risiko_sedang':           '#f97316',
+      'normal_/_aman':           '#4ade80',
+      'data_tidak_tersedia':     '#94a3b8'
     };
 
     const labels = data.map((d) => d.kategori || 'N/A');
@@ -196,10 +202,11 @@ const Charts = (() => {
   function renderHorizontalBarSawah(canvasId, dataList) {
     if (!dataList || !dataList.length) return;
     
-    // Potong top 15 saja agar tidak sesak jika data terlalu banyak
-    const topData = dataList.slice(0, 15);
-    const labels = topData.map(d => d.kecamatan);
-    const values = topData.map(d => d.luas_ha);
+    // Filter out entries with 0 or null values to remove gaps
+    const validData = dataList.filter(d => d && d.kecamatan && d.luas_ha > 0);
+    
+    const labels = validData.map(d => d.kecamatan);
+    const values = validData.map(d => d.luas_ha);
 
     return _create(canvasId, {
       type: 'bar',
@@ -236,35 +243,37 @@ const Charts = (() => {
   }
 
   // ─── Chart: Year-over-Year (Grouped Bar) ─────────
-  function renderYoy(canvasId, dataList) {
-    if (!dataList || !dataList.length) return;
+  function renderYoy(canvasId, result) {
+    if (!result || !result.data || !result.data.length || !result.years) return;
     
-    const labels = dataList.map(d => d.kecamatan);
-    const val23 = dataList.map(d => d['2023']);
-    const val24 = dataList.map(d => d['2024']);
-    const val25 = dataList.map(d => d['2025']);
+    const labels = result.data.map(d => d.kecamatan);
+    const palette = ['#94a3b8', '#60a5fa', '#1d4ed8', '#1e3a8a', '#10b981', '#f59e0b', '#ef4444'];
+    
+    const datasets = result.years.map((year, i) => {
+      return {
+        label: year,
+        data: result.data.map(d => d[year] || null),
+        backgroundColor: palette[i % palette.length]
+      };
+    });
 
     return _create(canvasId, {
       type: 'bar',
       data: {
         labels,
-        datasets: [
-          { label: '2023', data: val23, backgroundColor: '#94a3b8' },
-          { label: '2024', data: val24, backgroundColor: '#60a5fa' },
-          { label: '2025', data: val25, backgroundColor: '#1d4ed8' },
-        ],
+        datasets: datasets,
       },
       options: {
         ...BASE_OPTIONS,
         scales: {
           x: { grid: { display: false }, ticks: { maxRotation: 45, maxTicksLimit: 12, font: { size: 9 } } },
-          y: { min: 0, max: 0.8, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } },
+          y: { min: 0, max: 1, title: { display: true, text: 'Rata-rata NDVI', font: { size: 10 } } }
         },
         plugins: {
           ...BASE_OPTIONS.plugins,
-          legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
-        },
-      },
+          tooltip: { mode: 'index', intersect: false }
+        }
+      }
     });
   }
 
@@ -353,12 +362,13 @@ const Charts = (() => {
     });
     const values = data.map((d) => d.mean_ndvi ?? null);
 
-    // Warnai bar berdasarkan nilai NDVI
+    // Warnai bar berdasarkan nilai NDVI (4-band fenologi)
     const colors = values.map((v) => {
       if (!v) return '#94a3b8';
-      if (v < 0.25) return '#dc2626';
-      if (v < 0.40) return '#f97316';
-      return '#22c55e';
+      if (v < 0.2)  return '#b45309';  // Kerapatan Sangat Rendah — coklat
+      if (v < 0.4)  return '#f97316';  // Kerapatan Rendah — oranye
+      if (v < 0.6)  return '#4ade80';  // Kerapatan Sedang — hijau muda
+      return '#166534';                // Kerapatan Tinggi — hijau tua
     });
 
     return _create(canvasId, {

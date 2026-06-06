@@ -35,32 +35,38 @@ def _refresh_kpi(db: Session, kecamatan: str):
     """
     Recalculate kpi_kecamatan berdasarkan data aktual di sawah_karawang.
     Menggunakan UPDATE karena kolom fid NOT NULL (primary key).
+    Jika kecamatan tidak ada di KPI table, fungsi ini tidak akan melakukan apapun (UPDATE 0 rows).
     """
-    db.execute(text("""
-        UPDATE kpi_kecamatan
-        SET
-            "count" = sub.cnt,
-            "sum"   = sub.s,
-            "mean"  = sub.m,
-            "median"= sub.med,
-            "stddev"= sub.sd,
-            "min"   = sub.mn,
-            "max"   = sub.mx
-        FROM (
-            SELECT
-                COUNT(*)::int            AS cnt,
-                COALESCE(SUM(luas_ha),0) AS s,
-                COALESCE(AVG(luas_ha),0) AS m,
-                COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY luas_ha),0) AS med,
-                COALESCE(STDDEV(luas_ha),0)  AS sd,
-                COALESCE(MIN(luas_ha),0)     AS mn,
-                COALESCE(MAX(luas_ha),0)     AS mx
-            FROM sawah_karawang
-            WHERE LOWER(kecamatan) = LOWER(:kec)
-        ) sub
-        WHERE LOWER(kpi_kecamatan.kecamatan) = LOWER(:kec)
-    """), {"kec": kecamatan})
-    db.commit()
+    try:
+        db.execute(text("""
+            UPDATE kpi_kecamatan
+            SET
+                "count" = sub.cnt,
+                "sum"   = sub.s,
+                "mean"  = sub.m,
+                "median"= sub.med,
+                "stddev"= sub.sd,
+                "min"   = sub.mn,
+                "max"   = sub.mx
+            FROM (
+                SELECT
+                    COUNT(*)::int            AS cnt,
+                    COALESCE(SUM(luas_ha),0) AS s,
+                    COALESCE(AVG(luas_ha),0) AS m,
+                    COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY luas_ha),0) AS med,
+                    COALESCE(STDDEV(luas_ha),0)  AS sd,
+                    COALESCE(MIN(luas_ha),0)     AS mn,
+                    COALESCE(MAX(luas_ha),0)     AS mx
+                FROM sawah_karawang
+                WHERE LOWER(kecamatan) = LOWER(:kec)
+            ) sub
+            WHERE LOWER(kpi_kecamatan.kecamatan) = LOWER(:kec)
+        """), {"kec": kecamatan})
+        db.commit()
+    except Exception as e:
+        print(f"[ERROR] _refresh_kpi failed for kecamatan '{kecamatan}': {str(e)}")
+        db.rollback()
+        raise
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -70,36 +76,53 @@ def _refresh_kpi(db: Session, kecamatan: str):
 def create_sawah(body: SawahCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     import time
     
-    # Auto-generate id_sawah (numeric, 6 digits max usually) if not provided
-    generated_id_sawah = body.id_sawah
-    if not generated_id_sawah:
-        generated_id_sawah = float(int(time.time() * 100) % 899999 + 100000)
+    try:
+        # Auto-generate id_sawah (numeric, 6 digits max usually) if not provided
+        generated_id_sawah = body.id_sawah
+        if not generated_id_sawah:
+            generated_id_sawah = int(time.time() * 100) % 899999 + 100000
+        
+        print(f"[ADMIN] Creating new sawah: kecamatan={body.kecamatan}, id_sawah={generated_id_sawah}")
 
-    geojson_str = json.dumps(body.geojson_geometry)
-    sql = text("""
-        INSERT INTO sawah_karawang (kecamatan, luas_ha, id_sawah, status_data, wkb_geometry)
-        VALUES (
-            :kecamatan, 
-            COALESCE(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography) / 10000.0, 0),
-            :id_sawah, 
-            :status_data, 
-            ST_Multi(ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)))
-        )
-        RETURNING ogc_fid
-    """)
-    result = db.execute(sql, {
-        "kecamatan": body.kecamatan,
-        "id_sawah": generated_id_sawah,
-        "status_data": body.status_data,
-        "geojson": geojson_str,
-    })
-    db.commit()
-    new_id = result.fetchone()[0]
+        geojson_str = json.dumps(body.geojson_geometry)
+        sql = text("""
+            INSERT INTO sawah_karawang (kecamatan, luas_ha, id_sawah, status_data, wkb_geometry)
+            VALUES (
+                :kecamatan, 
+                COALESCE(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography) / 10000.0, 0),
+                :id_sawah, 
+                :status_data, 
+                ST_Multi(ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)))
+            )
+            RETURNING ogc_fid
+        """)
+        result = db.execute(sql, {
+            "kecamatan": body.kecamatan,
+            "id_sawah": generated_id_sawah,
+            "status_data": body.status_data,
+            "geojson": geojson_str,
+        })
+        
+        # PENTING: Fetch result SEBELUM commit!
+        row = result.fetchone()
+        if not row:
+            raise Exception("Gagal mendapatkan OGC FID setelah insert.")
+            
+        new_id = row[0]
+        db.commit()
 
-    # Auto-refresh KPI untuk kecamatan ini
-    _refresh_kpi(db, body.kecamatan)
+        # Auto-refresh KPI untuk kecamatan ini
+        try:
+            _refresh_kpi(db, body.kecamatan)
+        except Exception as e:
+            print(f"[WARN] KPI refresh failed for {body.kecamatan}: {e}")
 
-    return {"detail": "Poligon sawah berhasil ditambahkan", "ogc_fid": new_id}
+        return {"detail": "Poligon sawah berhasil ditambahkan", "ogc_fid": new_id}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"[ERROR] create_sawah failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Gagal tambah poligon: {str(e)}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -112,22 +135,29 @@ def update_sawah_geometry(ogc_fid: int, body: SawahUpdateGeometry, admin: User =
     if not check:
         raise HTTPException(status_code=404, detail=f"Poligon dengan ogc_fid={ogc_fid} tidak ditemukan")
 
-    geojson_str = json.dumps(body.geojson_geometry)
+    try:
+        geojson_str = json.dumps(body.geojson_geometry)
 
-    # Update geometri dan hitung ulang luas
-    sql = text("""
-        UPDATE sawah_karawang
-        SET wkb_geometry = ST_Multi(ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326))),
-            luas_ha = COALESCE(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography) / 10000.0, 0)
-        WHERE ogc_fid = :fid
-    """)
-    db.execute(sql, {"geojson": geojson_str, "fid": ogc_fid})
-    db.commit()
+        # Update geometri dan hitung ulang luas
+        sql = text("""
+            UPDATE sawah_karawang
+            SET wkb_geometry = ST_Multi(ST_Force3D(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326))),
+                luas_ha = COALESCE(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:geojson), 4326)::geography) / 10000.0, 0)
+            WHERE ogc_fid = :fid
+        """)
+        db.execute(sql, {"geojson": geojson_str, "fid": ogc_fid})
+        db.commit()
 
-    # Auto-refresh KPI untuk kecamatan ini
-    _refresh_kpi(db, check.kecamatan)
+        # Auto-refresh KPI untuk kecamatan ini
+        try:
+            _refresh_kpi(db, check.kecamatan)
+        except Exception as e:
+            print(f"[WARN] KPI refresh failed for {check.kecamatan}: {e}")
 
-    return {"detail": f"Geometri poligon ogc_fid={ogc_fid} berhasil diperbarui"}
+        return {"detail": f"Geometri poligon ogc_fid={ogc_fid} berhasil diperbarui"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Gagal update geometri: {str(e)}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -140,15 +170,22 @@ def delete_sawah(ogc_fid: int, admin: User = Depends(require_admin), db: Session
     if not check:
         raise HTTPException(status_code=404, detail=f"Poligon dengan ogc_fid={ogc_fid} tidak ditemukan")
 
-    kecamatan_name = check.kecamatan
+    try:
+        kecamatan_name = check.kecamatan
 
-    db.execute(text("DELETE FROM sawah_karawang WHERE ogc_fid = :fid"), {"fid": ogc_fid})
-    db.commit()
+        db.execute(text("DELETE FROM sawah_karawang WHERE ogc_fid = :fid"), {"fid": ogc_fid})
+        db.commit()
 
-    # Auto-refresh KPI untuk kecamatan ini
-    _refresh_kpi(db, kecamatan_name)
+        # Auto-refresh KPI untuk kecamatan ini
+        try:
+            _refresh_kpi(db, kecamatan_name)
+        except Exception as e:
+            print(f"[WARN] KPI refresh failed for {kecamatan_name}: {e}")
 
-    return {"detail": f"Poligon ogc_fid={ogc_fid} berhasil dihapus"}
+        return {"detail": f"Poligon ogc_fid={ogc_fid} berhasil dihapus"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Gagal hapus poligon: {str(e)}")
 
 
 
@@ -206,13 +243,56 @@ async def import_ndvi_csv(file: UploadFile = File(...), admin: User = Depends(re
                 errors.append(f"Baris {i}: 'kecamatan' atau 'periode' kosong")
                 continue
 
-            tahun = int(row.get("tahun", 0)) if row.get("tahun") else None
-            bulan = int(row.get("bulan", 0)) if row.get("bulan") else None
-            mean_ndvi = float(row.get("mean_ndvi", 0)) if row.get("mean_ndvi") else None
-            std_ndvi = float(row.get("std_ndvi", 0)) if row.get("std_ndvi") else 0
+            tahun_raw = row.get("tahun", "").strip() if row.get("tahun") else ""
+            bulan_raw = row.get("bulan", "").strip() if row.get("bulan") else ""
+
+            # Auto-derive tahun & bulan dari periode (format "YYYY-MM") jika kosong
+            if (not tahun_raw or not bulan_raw) and "-" in periode:
+                parts = periode.split("-")
+                if len(parts) == 2:
+                    tahun_raw = tahun_raw or parts[0]
+                    bulan_raw = bulan_raw or parts[1]
+
+            tahun = int(tahun_raw) if tahun_raw else None
+            bulan = int(bulan_raw) if bulan_raw else None
+
+            # Parse mean_ndvi & filter anomali
+            mean_ndvi_raw = row.get("mean_ndvi", "").strip() if row.get("mean_ndvi") else ""
+            if mean_ndvi_raw:
+                val = float(mean_ndvi_raw)
+                # Nilai anomali (-9999, negatif ekstrim, atau > 1) → NULL
+                mean_ndvi = None if (val <= -9999 or val < -1 or val > 1) else val
+            else:
+                mean_ndvi = None
+
+            std_ndvi_raw = row.get("std_ndvi", "").strip() if row.get("std_ndvi") else ""
+            if std_ndvi_raw:
+                sv = float(std_ndvi_raw)
+                std_ndvi = None if sv <= -9999 else sv
+            else:
+                std_ndvi = 0
+
             pixel_count = int(row.get("pixel_count", 0)) if row.get("pixel_count") else 0
             jumlah_citra = int(row.get("jumlah_citra", 0)) if row.get("jumlah_citra") else 0
-            kategori = row.get("kategori", "").strip() or None
+
+            # Auto-generate kategori berdasarkan mean_ndvi jika kosong
+            kategori_raw = row.get("kategori", "").strip() or None
+            if not kategori_raw and mean_ndvi is not None:
+                if mean_ndvi < 0.15:
+                    kategori_raw = "Kritis"
+                elif mean_ndvi < 0.25:
+                    kategori_raw = "Rendah"
+                elif mean_ndvi < 0.35:
+                    kategori_raw = "Sedang"
+                elif mean_ndvi < 0.5:
+                    kategori_raw = "Normal"
+                elif mean_ndvi < 0.65:
+                    kategori_raw = "Sehat"
+                else:
+                    kategori_raw = "Sangat Sehat"
+            elif not kategori_raw:
+                kategori_raw = "Data Tidak Tersedia"
+            kategori = kategori_raw
 
             # Upsert Data NDVI
             sql_upsert = text("""
@@ -241,10 +321,14 @@ async def import_ndvi_csv(file: UploadFile = File(...), admin: User = Depends(re
         except Exception as e:
             errors.append(f"Baris {i} Gagal: {str(e)}")
 
+    if errors:
+        db.rollback()
+        error_msg = f"Ditemukan {len(errors)} kesalahan format. Proses dibatalkan secara keseluruhan:\n" + "\n".join(errors[:20])
+        raise HTTPException(status_code=400, detail=error_msg)
+
     db.commit()
     return {
         "detail": f"Import data NDVI selesai. {updated} baris diproses.",
-        "errors": errors[:20],
     }
 
 
@@ -287,12 +371,11 @@ def export_ndvi_csv(
 # ──────────────────────────────────────────────────────────────────────────────
 # GET /api/admin/ndvi/export-filtered  — Export NDVI terfilter (tahun/bulan/kecamatan)
 # ──────────────────────────────────────────────────────────────────────────────
-@router.get("/ndvi/export-filtered", summary="Export NDVI terfilter ke CSV")
-def export_ndvi_filtered(
+@router.get("/ndvi/export-filtered", summary="Export data NDVI ke CSV (Terfilter)")
+def export_filtered_csv(
     tahun: int = None,
     bulan: int = None,
     kecamatan: str = None,
-    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     conditions = []
@@ -332,12 +415,11 @@ def export_ndvi_filtered(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# GET /api/admin/ranking/export-csv  — Export Ranking Risiko ke CSV
+# GET /api/admin/ranking/export-csv  — Export Kerapatan Vegetasi ke CSV
 # ──────────────────────────────────────────────────────────────────────────────
-@router.get("/ranking/export-csv", summary="Export ranking risiko kecamatan ke CSV")
+@router.get("/ranking/export-csv", summary="Export kerapatan vegetasi kecamatan ke CSV")
 def export_ranking_csv(
     tahun: int = None,
-    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     tahun_filter = "WHERE n.tahun = :tahun" if tahun else ""
@@ -356,24 +438,26 @@ def export_ranking_csv(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Rank", "Kecamatan", "Mean NDVI", "Kategori"])
+    writer.writerow(["Rank", "Kecamatan", "Indeks NDVI", "Kategori Kerapatan", "Indikasi Fase"])
     for i, row in enumerate(rows, 1):
         v = row.avg_ndvi
         if v is None:
-            kat = "Data Tidak Tersedia"
-        elif v < 0.25:
-            kat = "Risiko Tinggi"
-        elif v < 0.40:
-            kat = "Risiko Sedang"
+            kat, fase = "Data Tidak Tersedia", "-"
+        elif v < 0.2:
+            kat, fase = "Kerapatan Sangat Rendah", "Fase Bera / Persiapan Lahan"
+        elif v < 0.4:
+            kat, fase = "Kerapatan Rendah", "Fase Persemaian / Awal Tanam"
+        elif v < 0.6:
+            kat, fase = "Kerapatan Sedang", "Fase Pertumbuhan Vegetatif Aktif"
         else:
-            kat = "Normal / Aman"
-        writer.writerow([i, row.kecamatan, round(v, 4) if v else None, kat])
+            kat, fase = "Kerapatan Tinggi", "Fase Vegetatif Maksimal / Jelang Generatif"
+        writer.writerow([i, row.kecamatan, round(v, 4) if v else None, kat, fase])
 
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=ranking_risiko.csv"}
+        headers={"Content-Disposition": "attachment; filename=kerapatan_vegetasi.csv"}
     )
 
 
@@ -383,7 +467,6 @@ def export_ranking_csv(
 @router.get("/report/export-xlsx", summary="Export laporan analitik lengkap ke Excel (.xlsx)")
 def export_report_xlsx(
     tahun: int = None,
-    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     from openpyxl import Workbook
@@ -393,10 +476,10 @@ def export_report_xlsx(
     tahun_filter = "WHERE n.tahun = :tahun" if tahun else ""
     params = {"tahun": tahun} if tahun else {}
 
-    # ── Sheet 1: Ranking Risiko ──
+    # ── Sheet 1: Ranking Kerapatan Vegetasi ──
     ws1 = wb.active
-    ws1.title = "Ranking Risiko"
-    headers1 = ["Rank", "Kecamatan", "Mean NDVI", "Kategori"]
+    ws1.title = "Kerapatan Vegetasi"
+    headers1 = ["Rank", "Kecamatan", "Indeks NDVI", "Kategori Kerapatan", "Indikasi Fase"]
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="166534")
     thin_border = Border(
@@ -419,19 +502,29 @@ def export_report_xlsx(
     rows_rank = db.execute(sql_rank, params).fetchall()
     for i, row in enumerate(rows_rank, 1):
         v = row.avg_ndvi
-        kat = "Data Tidak Tersedia" if v is None else ("Risiko Tinggi" if v < 0.25 else ("Risiko Sedang" if v < 0.40 else "Normal / Aman"))
+        if v is None:
+            kat, fase = "Data Tidak Tersedia", "-"
+        elif v < 0.2:
+            kat, fase = "Kerapatan Sangat Rendah", "Fase Bera / Persiapan Lahan"
+        elif v < 0.4:
+            kat, fase = "Kerapatan Rendah", "Fase Persemaian / Awal Tanam"
+        elif v < 0.6:
+            kat, fase = "Kerapatan Sedang", "Fase Pertumbuhan Vegetatif Aktif"
+        else:
+            kat, fase = "Kerapatan Tinggi", "Fase Vegetatif Maksimal / Jelang Generatif"
         ws1.cell(row=i+1, column=1, value=i).border = thin_border
         ws1.cell(row=i+1, column=2, value=row.kecamatan).border = thin_border
         c = ws1.cell(row=i+1, column=3, value=round(v, 4) if v else None)
         c.border = thin_border
         c.number_format = "0.0000"
-        kat_cell = ws1.cell(row=i+1, column=4, value=kat)
-        kat_cell.border = thin_border
-        if kat == "Risiko Tinggi":
-            kat_cell.fill = PatternFill("solid", fgColor="FEE2E2")
-            kat_cell.font = Font(color="DC2626", bold=True)
-        elif kat == "Risiko Sedang":
-            kat_cell.fill = PatternFill("solid", fgColor="FEF3C7")
+        ws1.cell(row=i+1, column=4, value=kat).border = thin_border
+        fase_cell = ws1.cell(row=i+1, column=5, value=fase)
+        fase_cell.border = thin_border
+        if kat == "Kerapatan Sangat Rendah":
+            fase_cell.fill = PatternFill("solid", fgColor="FEF3C7")
+            fase_cell.font = Font(color="92400E", bold=True)
+        elif kat == "Kerapatan Rendah":
+            fase_cell.fill = PatternFill("solid", fgColor="FFF7ED")
 
     ws1.column_dimensions["A"].width = 8
     ws1.column_dimensions["B"].width = 22
@@ -497,5 +590,6 @@ def export_report_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={fname}"}
     )
+
 
 

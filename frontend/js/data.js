@@ -67,11 +67,17 @@ async function fetchBatasGeoJSON(filters = {}) {
 }
 
 /**
- * GeoJSON poligon petak sawah per kecamatan (ambil SEMUA poligon untuk kecamatan).
- * Tidak menggunakan BBox filter agar semua poligon tercakup tanpa kehilangan data.
+ * GeoJSON poligon petak sawah per kecamatan (lazy — hanya saat diklik).
+ * Limit default dikurangi agar performa aman; bisa dinaikkan.
  */
-async function fetchSawahGeoJSON(kecamatan, limit = null, bbox = null, signal = null) {
-  const params = new URLSearchParams({ kecamatan, t: Date.now() });
+async function fetchSawahGeoJSON(kecamatan, limit = 50000, bbox = null, signal = null) {
+  const params = new URLSearchParams({ kecamatan, limit, t: Date.now() });
+  if (bbox) {
+    params.set('min_lng', bbox.min_lng);
+    params.set('min_lat', bbox.min_lat);
+    params.set('max_lng', bbox.max_lng);
+    params.set('max_lat', bbox.max_lat);
+  }
   const fetchOpts = signal ? { signal } : {};
   const res = await fetch(`${API}/geo/sawah?${params}`, fetchOpts);
   if (!res.ok) throw new Error(`Gagal fetch sawah GeoJSON: ${kecamatan}`);

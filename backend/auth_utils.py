@@ -15,7 +15,7 @@ from models import User
 # ──────────────────────────────────────────────────────────────────────────────
 SECRET_KEY = "karawang-gis-dashboard-secret-key-2026-very-secure"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24
+ACCESS_TOKEN_EXPIRE_HOURS = 168  # 7 hari (sebelumnya 24 jam)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
@@ -45,7 +45,8 @@ def decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except JWTError:
+    except JWTError as e:
+        print(f"[JWT] Decode error: {str(e)}")
         return None
 
 
@@ -54,21 +55,29 @@ def decode_token(token: str) -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     """Dependency: Ambil user dari JWT token. Raise 401 jika gagal."""
+    print(f"[AUTH] Token received: {'Yes' if token else 'No'}")
+    
     if not token:
+        print("[AUTH] Token not found in request")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token tidak ditemukan")
 
     payload = decode_token(token)
     if not payload:
+        print(f"[AUTH] Token decode failed - token: {token[:20]}..." if len(token) > 20 else f"[AUTH] Token decode failed - token: {token}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token tidak valid atau kadaluarsa")
 
     username: str = payload.get("sub")
+    print(f"[AUTH] Username from token: {username}")
+    
     if not username:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token tidak valid")
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
+        print(f"[AUTH] User not found: {username}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User tidak ditemukan")
 
+    print(f"[AUTH] User authenticated: {user.username} (role: {user.role})")
     return user
 
 

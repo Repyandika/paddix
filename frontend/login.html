@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login — PADDIX</title>
+  <link rel="icon" type="image/png" href="./img/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
   <style>
@@ -190,8 +191,14 @@
     </div>
   </div>
 
+  <script src="./js/config.js?v=v19"></script>
   <script>
-    const API = '/api';
+    const API = window.APP_CONFIG?.API_BASE || (
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8000/api'
+        : '/api'
+    );
+    const LOGIN_URL = window.APP_CONFIG?.endpoints?.authLogin || `${API}/auth/login`;
 
     // Jika sudah login, langsung redirect
     if (localStorage.getItem('gis_token')) {
@@ -210,7 +217,7 @@
       const password = document.getElementById('password').value;
 
       try {
-        const res = await fetch(`${API}/auth/login`, {
+        const res = await fetch(LOGIN_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),

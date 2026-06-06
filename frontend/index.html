@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PADDIX - Executive Dashboard</title>
+  <title>PADDIX - E Dashboard</title>
+  <link rel="icon" type="image/png" href="./img/logo.png" />
   <meta name="description" content="Dashboard spasial padi/sawah dengan performa tinggi & analisis tingkat makro-mikro" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin />
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.19.2/dist/leaflet-geoman.css" />
-  <link rel="stylesheet" href="./css/style.css?v=v16" />
+  <link rel="stylesheet" href="./css/style.css?v=v22" />
 </head>
 <body>
 
@@ -31,10 +32,27 @@
             <option value="">Seluruh Kabupaten Karawang</option>
           </select>
         </div>
-        <!-- User info & Logout -->
+
+        <!-- Tombol Download Publik (tampil untuk semua pengguna) -->
+        <button id="btnPublicDownload" title="Download Laporan Analisis"
+          style="display:flex; align-items:center; gap:6px; padding:6px 14px; background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.4); border-radius:6px; color:#4ade80; font-size:12px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; white-space:nowrap; transition:background 0.2s;"
+          onmouseover="this.style.background='rgba(34,197,94,0.25)'" onmouseout="this.style.background='rgba(34,197,94,0.15)'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Unduh Laporan
+        </button>
+
+        <!-- User-info: login admin button (publik) ATAU nama+logout (admin login) -->
         <div class="user-info-bar">
-          <span id="userDisplayName" style="font-size:12px; color:rgba(255,255,255,.7); font-weight:600;"></span>
-          <button id="btnLogout" class="btn-logout" title="Keluar">
+          <!-- Tombol Login Admin — tampil saat belum login -->
+          <a id="btnAdminLogin" href="./login.html"
+            style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:rgba(255,255,255,0.85); font-size:12px; font-weight:600; text-decoration:none; font-family:'DM Sans',sans-serif; white-space:nowrap; transition:background 0.2s;"
+            onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Login Admin
+          </a>
+          <!-- Info + Logout — tampil saat admin sudah login -->
+          <span id="userDisplayName" style="display:none; font-size:12px; color:rgba(255,255,255,.7); font-weight:600;"></span>
+          <button id="btnLogout" class="btn-logout" style="display:none;" title="Keluar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
@@ -58,27 +76,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload Data
       </button>
-      <button class="admin-btn" id="btnEditPolygon" title="Edit Poligon Sawah">
+      <button class="admin-btn" id="btnModeDigitasi" title="Masuk Mode Digitasi Poligon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Edit Poligon
-      </button>
-      <button class="admin-btn" id="btnDeletePolygon" title="Hapus Poligon Sawah">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        Hapus Poligon
-      </button>
-      <button class="admin-btn" id="btnManageUsers" title="Kelola Akun">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Kelola Akun
+        Digitasi
       </button>
     </div>
   </div>
 
-  <!-- GEOMAN EDIT BAR (muncul saat mode edit poligon aktif) -->
-  <div id="geomanEditBar" class="draw-toolbar hidden">
-    <span style="font-size:12px; color:#fff;">Mode Edit Aktif — Drag titik sudut poligon untuk mengubah bentuknya</span>
-    <button class="admin-btn" onclick="Admin.saveAllEdits()" style="background:#22c55e; border-color:#16a34a;">Simpan Semua Perubahan</button>
-    <button class="admin-btn" onclick="Admin.cancelAllEdits()" style="background:#dc2626; border-color:#b91c1c;">Batal</button>
-  </div>
+
 
   <main class="dashboard-scroll">
     <div class="status-bar">
@@ -88,6 +93,30 @@
 
     <!-- Peta Utama -->
     <section class="map-container-wrapper">
+      <!-- DIGITASI TOOLBAR (custom) -->
+      <div id="digitasiToolbar" class="draw-toolbar hidden">
+        <span class="toolbar-title">🛠 Mode Digitasi</span>
+        
+        <button class="admin-btn" id="btnDigiAdd" style="background:#3b82f6; border:1px solid rgba(255,255,255,0.2); color:#fff;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+          Gambar Poligon
+        </button>
+        
+        <button class="admin-btn hidden" id="btnDigiCancelDraw" style="background:#ef4444; border:1px solid rgba(255,255,255,0.2); color:#fff;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          Batal Gambar
+        </button>
+        
+        <button class="admin-btn hidden" id="btnDigiFinishEdit" onclick="Admin.cancelAllEdits()" style="background:#10b981; border:1px solid rgba(255,255,255,0.2); color:#fff;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Selesai Edit
+        </button>
+        
+        <button class="admin-btn" id="btnDigiExit" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); color:#fff; margin-left:auto;">
+          Keluar Digitasi
+        </button>
+      </div>
+
       <div id="map"></div>
       <button class="btn-fullscreen" id="btnFullscreenMap" title="Toggle Fullscreen Map">
         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
@@ -95,6 +124,12 @@
       <div id="mapLoader" class="map-loader hidden">
         <div class="loader-spinner"></div>
         <span id="mapLoaderText">Menarik jutaan data...</span>
+      </div>
+
+      <!-- Floating Zoom Warning -->
+      <div id="sawahZoomWarning" class="map-zoom-warning hidden">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Perbesar peta (Zoom In) untuk memuat detail petak sawah.</span>
       </div>
 
       <div class="map-floating-controls">
@@ -107,8 +142,8 @@
           <div class="mode-toggles mt-2 hidden" id="sawahStyleControls">
             <h4 class="control-title" style="margin-top:12px;">Gaya Polygon Sawah</h4>
             <div class="toggle-group">
-              <button class="toggle-btn active" id="btnOutline" data-mode="outline">Outline (Satelit Jelas)</button>
-              <button class="toggle-btn" id="btnFill" data-mode="fill">Fill (Warna Penuh)</button>
+              <button class="toggle-btn" id="btnOutline" data-mode="outline">Outline (Satelit Jelas)</button>
+              <button class="toggle-btn active" id="btnFill" data-mode="fill">Fill (Warna Penuh)</button>
             </div>
             <div class="opacity-control mt-2">
               <label for="opacitySlider" class="control-title">Kepadatan Warna:</label>
@@ -119,14 +154,87 @@
       </div>
 
       <div class="map-floating-legend">
-        <h4>Indikasi Risiko Lahan (NDVI)</h4>
+        <h4 style="display:flex; align-items:center; gap:6px;">
+          Kerapatan Vegetasi (NDVI)
+          <!-- Info icon tooltip -->
+          <span class="legend-info-icon" title="Klasifikasi ini menginterpretasikan tingkat kerapatan vegetasi untuk memantau siklus tanam lahan sawah secara periodik."
+            style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:rgba(255,255,255,0.25); color:#fff; font-size:10px; font-weight:700; cursor:help; border:1px solid rgba(255,255,255,0.5); flex-shrink:0;"
+            aria-label="Informasi klasifikasi NDVI">i</span>
+        </h4>
         <div class="legend-grid">
-          <div class="legend-item"><span class="dot" style="background:#dc2626;"></span><span>Tinggi (&lt;0.15)</span></div>
-          <div class="legend-item"><span class="dot" style="background:#f97316;"></span><span>Waspada (0.15–0.25)</span></div>
-          <div class="legend-item"><span class="dot" style="background:#eab308;"></span><span>Perhatian (0.25–0.35)</span></div>
-          <div class="legend-item"><span class="dot" style="background:#84cc16;"></span><span>Aman (0.35–0.5)</span></div>
-          <div class="legend-item"><span class="dot" style="background:#22c55e;"></span><span>Sehat (0.5–0.65)</span></div>
-          <div class="legend-item"><span class="dot" style="background:#166534;"></span><span>Sangat Sehat (&gt;0.65)</span></div>
+          <div class="legend-item"><span class="dot" style="background:#b45309;"></span><span>Sangat Rendah (&lt;0.2) — Bera/Penggenangan</span></div>
+          <div class="legend-item"><span class="dot" style="background:#f97316;"></span><span>Rendah (0.2–0.4) — Persemaian/Awal Tanam</span></div>
+          <div class="legend-item"><span class="dot" style="background:#4ade80;"></span><span>Sedang (0.4–0.6) — Vegetatif Aktif</span></div>
+          <div class="legend-item"><span class="dot" style="background:#166534;"></span><span>Tinggi (&gt;0.6) — Vegetatif Maksimal</span></div>
+        </div>
+      </div>
+
+      <!-- Floating Search Koordinat (bawah-kiri) -->
+      <div id="coordSearchWidget" class="coord-search-widget">
+
+        <!-- Header -->
+        <div class="coord-search-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span>Cari Koordinat</span>
+          <button id="coordSearchToggle" class="coord-search-toggle" title="Tutup">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+
+        <!-- Body -->
+        <div id="coordSearchBody" class="coord-search-body">
+
+          <!-- Input bar -->
+          <div class="coord-search-row">
+            <input
+              type="text"
+              id="coordSearchInput"
+              class="coord-search-input"
+              placeholder="-6.3542, 107.3211"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="coordSearchBtn" class="coord-search-btn" title="Cari">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                   stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Error -->
+          <p id="coordSearchError" class="coord-search-error"></p>
+
+          <!-- Hint -->
+          <p class="coord-search-hint">Desimal atau DMS · Tekan Enter / klik 🔍</p>
+
+          <!-- Panel Hasil (muncul setelah search) -->
+          <div id="coordResultPanel" class="coord-result-panel" style="display:none;">
+            <div class="coord-result-header">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="#ef4444"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+              <span id="coordResultName" class="coord-result-name">—</span>
+              <button id="coordResultClear" class="coord-result-clear" title="Hapus">✕</button>
+            </div>
+            <span id="coordResultKec" class="coord-result-kec-badge" style="display:none;"></span>
+            <div class="coord-result-rows">
+              <div class="coord-result-row">
+                <span class="coord-result-label">Lintang</span>
+                <span id="coordResultLat" class="coord-result-value">—</span>
+              </div>
+              <div class="coord-result-row">
+                <span class="coord-result-label">Bujur</span>
+                <span id="coordResultLng" class="coord-result-value">—</span>
+              </div>
+              <div class="coord-result-row">
+                <span class="coord-result-label">DMS</span>
+                <span id="coordResultDMS" class="coord-result-value" style="font-size:10px;">—</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -216,19 +324,21 @@
               <p class="panel-desc">Distribusi lahan sawah berdasarkan rekapitulasi KPI Luas Hektar</p>
             </div>
           </div>
-          <div class="panel-body chart-wrapper" style="height:350px;">
-            <canvas id="chartSawah"></canvas>
+          <div class="panel-body" style="display:block; height:350px; max-height:350px; overflow-y:auto; overflow-x:hidden; padding-right:8px;">
+            <div style="height:750px; position:relative; width:100%;">
+              <canvas id="chartSawah"></canvas>
+            </div>
           </div>
         </div>
 
         <div class="dashboard-panel">
           <div class="panel-header" style="flex-direction:column; align-items:stretch;">
-            <h3>Peringkat Kinerja Wilayah</h3>
+            <h3 id="rankingTitleText">Peringkat Kerapatan Vegetasi Wilayah</h3>
             <select id="rankingKategori" class="mt-2" style="width:100%; font-size:12px; height:34px; border-color:var(--border-mid); border-radius:6px; padding-left:10px;">
               <option value="terluas">Sawah Terluas (Hektar)</option>
               <option value="kepadatan">Kepadatan Lahan Sawah (%)</option>
-              <option value="ndvi_best">NDVI Terbaik (Paling Sehat)</option>
-              <option value="ndvi_worst">NDVI Terburuk (Risiko Tinggi)</option>
+              <option value="ndvi_best">Kerapatan Vegetasi Tertinggi (Fase Vegetatif Maksimal)</option>
+              <option value="ndvi_worst">Kerapatan Vegetasi Terendah (Fase Awal Tanam)</option>
             </select>
           </div>
           <div class="panel-body mt-2" style="align-items:stretch; justify-content:flex-start;">
@@ -245,14 +355,13 @@
     <!-- SECTION 2: ANALISIS NDVI (TEMPORAL) -->
     <section class="analytics-container" style="padding-top:10px;">
       <h2 style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:8px;">
-        2. Analisis Tingkat Kesuburan / Indeks NDVI <span id="section2TitleText" style="color:#2563eb">(Seluruh Kab. Karawang)</span>
+       2. Analisis Temporal Tren Kerapatan Vegetasi (NDVI) <span id="section2TitleText" style="color:#2563eb">(Seluruh Kab. Karawang)</span>
       </h2>
 
       <!-- Filter panel -->
       <div class="ndvi-filter-panel">
         <div>
           <h3>Setel Indikator Temporal NDVI</h3>
-          <p class="panel-desc">Filter berantai pada Peta, Rata-rata Skor, Diagram, dan Papan Peringkat.</p>
         </div>
         <div class="ndvi-filter-selects">
           <select id="filterTahun">
@@ -277,18 +386,27 @@
         </div>
       </div>
 
+      <!-- INSIGHT TEMPORAL NDVI (Dynamic per Kecamatan / Global) -->
+      <div id="ndviInsightPanel" style="background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid #3b82f6; padding:16px 20px; border-radius:var(--r-md); margin-bottom:20px;">
+        <h4 style="font-size:12px; font-weight:700; color:#1e40af; text-transform:uppercase; letter-spacing:0.05em; margin:0 0 6px 0; display:flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          Analisis Tren NDVI: <span id="ndviInsightWilayahTitle">Kecamatan Aktif</span>
+        </h4>
+        <p id="ndviInsightText" style="font-size:13px; color:#1e3a8a; line-height:1.6; margin:0;">
+          Memuat analisis perkembangan tanaman sawah...
+        </p>
+      </div>
+
       <div class="dashboard-grid" style="grid-template-columns: 1fr;">        <div class="dashboard-panel trend-panel" style="margin-top:0;">
           <div class="panel-header" style="flex-wrap:wrap; gap:10px;">
             <div style="flex:1;">
               <h3 style="display:flex; align-items:center; gap:8px;">
                 Riwayat Perkembangan NDVI (Time Series Bulanan)
               </h3>
-              <p class="panel-desc">Titik merah/oranye menandakan anomali atau bulan dengan Indeks Vegetasi kritis (< 0.25). Garis yang terputus mengindikasikan Data Tidak Tersedia pada bulan tersebut (misal: tutupan awan parah).</p>
+              <p class="panel-desc">Titik berwarna coklat/oranye menandakan bulan dengan kerapatan vegetasi sangat rendah (NDVI &lt; 0.2) — kemungkinan fase bera atau penggenangan lahan. Garis yang terputus mengindikasikan Data Tidak Tersedia pada bulan tersebut (misal: tutupan awan parah).</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-              <select id="trendFilterKecamatan" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
-                <option value="">Semua Kecamatan (Global)</option>
-              </select>
+              <span id="trendWilayahBadge" style="height:32px; display:inline-flex; align-items:center; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border-light); padding:0 12px; white-space:nowrap;">Semua Kecamatan (Global)</span>
             </div>
           </div>
           <div class="panel-body large-chart-wrapper" style="height:320px;">
@@ -298,8 +416,8 @@
         
           <div class="panel-header" style="flex-wrap:wrap; gap:10px;">
             <div style="flex:1; min-width:300px;">
-              <h3>Heatmap Distribusi Risiko (Kecamatan × Bulan)</h3>
-              <p class="panel-desc">Visualisasi pekat-lemahnya NDVI secara spasio-temporal. <strong style="color:var(--red-risk);">Merah: Kritis</strong>, Kuning: Waspada, <strong style="color:var(--sage);">Hijau: Normal.</strong></p>
+              <h3>Heatmap Kerapatan Vegetasi (Kecamatan x Bulan)</h3>
+              <p class="panel-desc">Visualisasi kerapatan vegetasi NDVI secara spasio-temporal. <strong style="color:#b45309;">Coklat: Sangat Rendah (Bera)</strong>, <span style="color:#ea580c;">Oranye: Rendah (Awal Tanam)</span>, <strong style="color:var(--sage);">Hijau: Sedang–Tinggi (Vegetatif).</strong></p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
               <select id="heatmapTahun" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
@@ -307,8 +425,8 @@
               </select>
               <select id="heatmapSort" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
                 <option value="asc">Urut Abjad (A-Z)</option>
-                <option value="healthiest">Paling Sehat (NDVI Tertinggi)</option>
-                <option value="worst">Paling Kritis (NDVI Terendah)</option>
+                <option value="healthiest">Kerapatan Tertinggi (Fase Vegetatif Maksimal)</option>
+                <option value="worst">Kerapatan Terendah (Fase Bera / Awal Tanam)</option>
               </select>
             </div>
           </div>
@@ -330,7 +448,6 @@
           <div class="panel-header" style="flex-wrap:wrap; gap:10px;">
             <div style="flex:1;">
               <h3>Pertumbuhan NDVI dari Tahun ke Tahun (YoY)</h3>
-              <p class="panel-desc">Perbandingan rata-rata NDVI tahun 2023, 2024, dan 2025.</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
               <select id="filterYoySort" style="height:32px; font-size:11px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-light); padding:0 8px;">
@@ -376,43 +493,6 @@
   <!-- ═══════════════════════════════════════════════════ -->
   <!-- MODALS -->
   <!-- ═══════════════════════════════════════════════════ -->
-
-  <!-- Modal: Kelola Akun -->
-  <div id="modalUsers" class="modal-overlay hidden" onclick="if(event.target===this)Admin.closeModal('modalUsers')">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>Kelola Akun Pengguna</h3>
-        <button class="modal-close" onclick="Admin.closeModal('modalUsers')">&times;</button>
-      </div>
-      <div class="modal-body">
-        <table class="detail-table" style="font-size:13px; margin-bottom:20px;">
-          <thead><tr style="border-bottom:2px solid var(--border-mid);"><th>ID</th><th>Username</th><th>Role</th><th>Aksi</th></tr></thead>
-          <tbody id="userListBody"></tbody>
-        </table>
-        <div style="background:var(--sage-ghost); border:1px solid var(--sage-border); padding:16px; border-radius:10px;">
-          <h4 style="font-size:13px; font-weight:700; margin-bottom:12px; color:var(--forest);">Tambah User Baru</h4>
-          <div style="display:grid; grid-template-columns:1fr 1fr auto auto; gap:8px; align-items:end;">
-            <div>
-              <label style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Username</label>
-              <input type="text" id="newUsername" placeholder="username" style="width:100%; height:36px; padding:0 10px; border:1px solid var(--border-mid); border-radius:6px; font-size:13px;" />
-            </div>
-            <div>
-              <label style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Password</label>
-              <input type="password" id="newPassword" placeholder="password" style="width:100%; height:36px; padding:0 10px; border:1px solid var(--border-mid); border-radius:6px; font-size:13px;" />
-            </div>
-            <div>
-              <label style="font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase;">Role</label>
-              <select id="newRole" style="height:36px; background:#fff; color:var(--text-primary); border:1px solid var(--border-mid); border-radius:6px; font-size:13px; min-width:90px;">
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <button class="btn-primary" onclick="Admin.handleAddUser()" style="height:36px;">Tambah</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Modal: Upload CSV -->
   <div id="modalImport" class="modal-overlay hidden" onclick="if(event.target===this)Admin.closeModal('modalImport')">
@@ -478,7 +558,7 @@
 
         <!-- Tab Content: Excel -->
         <div id="dlTab_excel" class="dl-tab-content hidden">
-          <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Ekspor laporan analitik lengkap dengan tiga lembar kerja: <strong>Ranking Risiko</strong>, <strong>Data NDVI Bulanan</strong>, dan <strong>Statistik Ringkasan</strong>.</p>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Ekspor laporan analitik lengkap dengan tiga lembar kerja: <strong>Ranking Kerapatan Vegetasi</strong>, <strong>Data NDVI Bulanan</strong>, dan <strong>Statistik Ringkasan</strong>.</p>
           <button class="btn-primary" onclick="Admin.handleDownloadExcel()" style="width:100%;">⬇ Unduh Laporan Analitik (.xlsx)</button>
         </div>
 
@@ -492,12 +572,14 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.19.2/dist/leaflet-geoman.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="./js/auth.js?v=v16"></script>
-  <script src="./js/data.js?v=v16"></script>
-  <script src="./js/map.js?v=v16"></script>
-  <script src="./js/charts.js?v=v16"></script>
-  <script src="./js/admin.js?v=v16"></script>
-  <script src="./js/app.js?v=v16"></script>
+  <script src="./js/config.js?v=20260522a"></script>
+  <script src="./js/auth.js?v=20260522a"></script>
+  <script src="./js/data.js?v=20260522e"></script>
+  <script src="./js/map.js?v=20260527f"></script>
+  <script src="./js/coord-search.js?v=20260527e"></script>
+  <script src="./js/charts.js?v=20260522a"></script>
+  <script src="./js/admin.js?v=20260522a"></script>
+  <script src="./js/app.js?v=20260522e"></script>
 
 </body>
 </html>
