@@ -1,16 +1,18 @@
 /**
  * config.js
  * Konfigurasi endpoint terpusat untuk frontend PADDIX.
+ * [PRODUCTION] API_BASE menggunakan path relatif agar kompatibel
+ * dengan Nginx reverse proxy di VPS maupun pengembangan lokal.
  */
 
 (function initAppConfig() {
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const API_BASE = isLocal ? `${window.location.origin}/api` : '/api';
+  // Relative path: bekerja di semua environment (localhost via proxy & VPS).
+  const API_BASE = '/api';
 
   const endpoints = Object.freeze({
-    authLogin: `${API_BASE}/auth/login`,
+    authLogin:    `${API_BASE}/auth/login`,
     authRegister: `${API_BASE}/auth/register`,
-    authUsers: `${API_BASE}/auth/users`,
+    authUsers:    `${API_BASE}/auth/users`,
   });
 
   function apiUrl(path) {
@@ -24,3 +26,4 @@
     apiUrl,
   });
 })();
+

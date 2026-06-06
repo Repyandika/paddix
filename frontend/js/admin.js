@@ -4,11 +4,10 @@
  */
 
 const Admin = (() => {
-  const API = window.APP_CONFIG?.API_BASE || (
-    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://localhost:8000/api'
-      : '/api'
-  );
+  // [PRODUCTION] API path bersumber dari config.js (selalu '/api').
+  // Kompatibel dengan Nginx reverse proxy di VPS maupun dev lokal via proxy.
+  const API = window.APP_CONFIG?.API_BASE || '/api';
+
   const AUTH_USERS_URL = window.APP_CONFIG?.endpoints?.authUsers || `${API}/auth/users`;
   const AUTH_REGISTER_URL = window.APP_CONFIG?.endpoints?.authRegister || `${API}/auth/register`;
 
