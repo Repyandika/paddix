@@ -30,8 +30,9 @@ const Auth = (() => {
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    window.location.href = 'index.html';
+    window.location.href = 'login.html';
   }
+
 
   /**
    * Proteksi halaman: jika belum login, redirect ke login.

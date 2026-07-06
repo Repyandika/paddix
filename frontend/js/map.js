@@ -105,7 +105,7 @@ const MapManager = (() => {
     L.tileLayer(
       'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
       {
-        attribution: 'Map data © Google',
+        attribution: 'Map data &copy; Google &nbsp;|&nbsp; NDVI: Sentinel-2 L2A (Copernicus) &nbsp;|&nbsp; Batas: BIG &nbsp;|&nbsp; Sawah: Digitasi Mandiri',
         maxZoom: 22,
         maxNativeZoom: 20
       }
@@ -122,6 +122,7 @@ const MapManager = (() => {
         pane: 'overlayPane',
       }
     ).addTo(_map);
+
 
     // Event listener: refresh visible sawah polygons on pan/zoom
     // Guard: jangan reload saat Geoman draw/edit aktif (mencegah map jump)
